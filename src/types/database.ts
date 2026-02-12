@@ -234,6 +234,78 @@ export interface LeverageLog {
     timestamp: string;
 }
 
+export type InvoiceStatus = "Pending" | "Paid" | "Overdue" | "Cancelled";
+export type PaymentMethod = "Transfer" | "Card" | "Cash";
+export type AmendmentStatus = "Draft" | "Signed";
+export type CommChannel = "WhatsApp" | "Email" | "Call" | "Meeting";
+
+export interface Invoice {
+    id: string;
+    client_id: string;
+    project_id: string | null;
+    amount: number;
+    status: InvoiceStatus;
+    due_date: string | null;
+    pdf_url: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Payment {
+    id: string;
+    invoice_id: string;
+    amount: number;
+    method: PaymentMethod;
+    transaction_ref: string | null;
+    timestamp: string;
+}
+
+export interface ContractAmendment {
+    id: string;
+    contract_id: string;
+    summary: string;
+    changes_json: Record<string, unknown> | null;
+    status: AmendmentStatus;
+    effective_date: string | null;
+    created_at: string;
+}
+
+export interface MeetingMinutes {
+    id: string;
+    project_id: string | null;
+    title: string;
+    date: string;
+    summary_md: string | null;
+    outcomes_md: string | null;
+    expectations_md: string | null;
+    created_at: string;
+}
+
+export interface CommunicationLog {
+    id: string;
+    client_id: string;
+    channel: CommChannel;
+    summary: string;
+    sentiment_score: number | null;
+    timestamp: string;
+}
+
+export type InvoiceInsert = Omit<Invoice, "id" | "created_at" | "updated_at">;
+export type InvoiceUpdate = Partial<InvoiceInsert>;
+
+export type PaymentInsert = Omit<Payment, "id" | "timestamp">; // payment timestamp is usually set by user or default
+export type PaymentUpdate = Partial<PaymentInsert>;
+
+export type ContractAmendmentInsert = Omit<ContractAmendment, "id" | "created_at">;
+export type ContractAmendmentUpdate = Partial<ContractAmendmentInsert>;
+
+export type MeetingMinutesInsert = Omit<MeetingMinutes, "id" | "created_at">;
+export type MeetingMinutesUpdate = Partial<MeetingMinutesInsert>;
+
+export type CommunicationLogInsert = Omit<CommunicationLog, "id">;
+export type CommunicationLogUpdate = Partial<CommunicationLogInsert>;
+
+
 // ─── Insert Types ────────────────────────────────────────────────────────────
 
 export type ClientInsert = Omit<Client, "id" | "created_at" | "updated_at">;
@@ -273,6 +345,12 @@ export interface Database {
             deployments: { Row: Deployment; Insert: Omit<Deployment, "id" | "created_at">; Update: Partial<Omit<Deployment, "id" | "created_at">> };
             agent_reports: { Row: AgentReport; Insert: Omit<AgentReport, "id" | "created_at">; Update: Partial<Omit<AgentReport, "id" | "created_at">> };
             service_catalog: { Row: ServiceCatalogItem; Insert: Omit<ServiceCatalogItem, "id" | "created_at">; Update: Partial<Omit<ServiceCatalogItem, "id" | "created_at">> };
+            invoices: { Row: Invoice; Insert: InvoiceInsert; Update: InvoiceUpdate };
+            payments: { Row: Payment; Insert: PaymentInsert; Update: PaymentUpdate };
+            contract_amendments: { Row: ContractAmendment; Insert: ContractAmendmentInsert; Update: ContractAmendmentUpdate };
+            meeting_minutes: { Row: MeetingMinutes; Insert: MeetingMinutesInsert; Update: MeetingMinutesUpdate };
+            communication_logs: { Row: CommunicationLog; Insert: CommunicationLogInsert; Update: CommunicationLogUpdate };
+
         };
     };
 }

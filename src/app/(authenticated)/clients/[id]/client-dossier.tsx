@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useRef } from "react";
 import type { Client, Opportunity, Contract, Project, AgentReport } from "@/types/database";
 import {
   ArrowLeft, Heart, FileText, FolderKanban, TrendingUp,
-  Bot, ExternalLink, Globe, Palette,
+  Bot, ExternalLink, Globe, Palette, Upload, Loader2,
 } from "lucide-react";
+import { uploadFile } from "@/lib/storage";
+import { updateClientLogo } from "@/lib/actions/assets";
 
 function currency(v: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v); }
 
@@ -21,9 +25,32 @@ export function ClientDossier({
 }: {
   client: Client; opportunities: Opportunity[]; contracts: Contract[]; projects: Project[]; agentReports: AgentReport[];
 }) {
+  const router = useRouter();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+
   const activeContracts = contracts.filter((c) => c.status === "Active");
   const totalRevenue = activeContracts.reduce((s, c) => s + Number(c.total_value), 0);
   const unresolvedAlerts = agentReports.filter((r) => !r.is_resolved);
+
+  const handleLogoClick = () => logoInputRef.current?.click();
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!e.target.files?.length) return;
+      const file = e.target.files[0];
+      try {
+          setLogoUploading(true);
+          const url = await uploadFile("clients", file);
+          await updateClientLogo(client.id, url);
+          router.refresh();
+      } catch(err) {
+          console.error(err);
+          alert("Logo upload failed");
+      } finally {
+          setLogoUploading(false);
+          if (logoInputRef.current) logoInputRef.current.value = "";
+      }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -35,12 +62,28 @@ export function ClientDossier({
         <Link href="/clients" className="mr-3 p-1.5 hover:bg-accent rounded-lg transition-colors">
           <ArrowLeft className="w-4 h-4 text-muted-foreground" />
         </Link>
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white mr-3"
-          style={{ background: `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})` }}
-        >
-          {client.name.charAt(0).toUpperCase()}
+        
+        {/* LOGO */}
+        <div className="relative group mr-3">
+            <div 
+                onClick={handleLogoClick}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white overflow-hidden cursor-pointer relative shadow-sm border border-white/10"
+                style={{ background: client.logo_url ? 'transparent' : `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})` }}
+            >
+                {client.logo_url ? (
+                    <img src={client.logo_url} alt={client.name} className="w-full h-full object-cover" />
+                ) : (
+                    client.name.charAt(0).toUpperCase()
+                )}
+                
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
+                    {logoUploading ? <Loader2 className="w-3 h-3 text-white animate-spin" /> : <Upload className="w-3 h-3 text-white" />}
+                </div>
+            </div>
+            <input type="file" ref={logoInputRef} onChange={handleLogoChange} accept="image/*" className="hidden" />
         </div>
+
         <div>
           <span className="text-sm font-bold text-foreground">{client.name}</span>
           <span className="block text-[10px] text-muted-foreground">Client Dossier</span>

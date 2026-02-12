@@ -20,6 +20,9 @@ import {
   Calculator,
   Beaker,
   Rocket,
+  DollarSign,
+  CalendarDays,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,9 +35,12 @@ const navItems = [
   { label: "Command Hub", href: "/dashboard", icon: LayoutDashboard, section: "cockpit" },
   { label: "Pipeline", href: "/pipeline", icon: TrendingUp, section: "cockpit" },
   { label: "Clients", href: "/clients", icon: Users, section: "cockpit" },
+  { label: "Meetings", href: "/meetings", icon: CalendarDays, section: "cockpit" },
+  { label: "Comms", href: "/comms", icon: MessageSquare, section: "cockpit" },
   { label: "The Forge", href: "/forge", icon: FolderKanban, section: "operations" },
   { label: "The Vault", href: "/vault", icon: Vault, section: "operations" },
   { label: "Generator Lab", href: "/generator", icon: Beaker, section: "operations" },
+  { label: "Finance", href: "/finance", icon: DollarSign, section: "operations" },
   { label: "Deployments", href: "/deployments", icon: Rocket, section: "intel" },
   { label: "Agent Terminal", href: "/terminal", icon: Bot, section: "intel" },
   { label: "Guardian", href: "/logs", icon: Shield, section: "intel" },

@@ -35,11 +35,25 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
+  const minutesRes = await supabase
+    .from("meeting_minutes")
+    .select("*")
+    .eq("project_id", id)
+    .order("date", { ascending: false });
+
+  const invoicesRes = await supabase
+    .from("invoices")
+    .select("*, clients(name)")
+    .eq("project_id", id)
+    .order("created_at", { ascending: false });
+
   return (
     <ProjectForge
       project={project}
       tasks={tasksRes.data ?? []}
       assets={assetsRes.data ?? []}
+      minutes={minutesRes.data ?? []}
+      invoices={(invoicesRes.data as any[]) ?? []}
     />
   );
 }
