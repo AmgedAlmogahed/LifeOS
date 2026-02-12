@@ -1,12 +1,22 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { Task, FocusSession, Subtask } from "@/types/database";
+import { Task, FocusSession } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Clock, MoreHorizontal, Plus } from "lucide-react";
+import { CheckCircle2, Circle, Clock, MoreHorizontal, Plus, AlertCircle } from "lucide-react";
 import { updateTask } from "@/lib/actions/tasks";
-import { addSubtask, toggleSubtask, logTime, unsetCurrentTask } from "@/lib/actions/flow-board";
+import { addSubtask, toggleSubtask, logTime, unsetCurrentTask, toggleTaskCurrent } from "@/lib/actions/flow-board";
+import { getNextTask } from "@/lib/actions/flow-board-next";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+
+// Define Subtask locally to avoid import issues
+interface Subtask {
+    id: string;
+    title: string;
+    completed: boolean;
+}
 
 interface CurrentTaskZoneProps {
   task?: Task;
@@ -47,11 +57,39 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
       );
   }
 
+  const [isBlockedDialogOpen, setIsBlockedDialogOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+
   const handleComplete = () => {
       startTransition(async () => {
+          // 1. Mark current done
           await updateTask(task.id, { status: "Done", completed_at: new Date().toISOString() });
-          await unsetCurrentTask(projectId); 
+          
+          // 2. Try to find next task
+          const { task: nextTask } = await getNextTask(projectId, task.id);
+          
+          if (nextTask) {
+              await toggleTaskCurrent(nextTask.id, projectId);
+              toast.success("Task completed!", { description: `Auto-advanced to: ${nextTask.title}` });
+          } else {
+              await unsetCurrentTask(projectId); 
+              toast.success("Task completed! No next task found.");
+          }
       });
+  };
+  
+  const handleBlock = () => {
+        if (!blockReason.trim()) return;
+        startTransition(async () => {
+            await updateTask(task.id, { 
+                status: "Blocked", 
+                // We might want to store reason in a note or specific field if schema supports it
+                // For now just status.
+            });
+            await unsetCurrentTask(projectId);
+            setIsBlockedDialogOpen(false);
+            setBlockReason("");
+        });
   };
 
   const handleAddSubtask = async (e: React.FormEvent) => {
@@ -86,7 +124,34 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
                          {Math.floor((task.time_spent_minutes || 0) + (elapsed / 60))}m
                      </div>
                  </div>
-                 <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-full" onClick={() => unsetCurrentTask(projectId)}>
+                 
+                 {/* Block Button with Popover/Dialog */}
+                 <Dialog open={isBlockedDialogOpen} onOpenChange={setIsBlockedDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-9 px-3 text-red-500 hover:text-red-600 hover:bg-red-50" title="Block Task">
+                            <AlertCircle className="w-4 h-4 mr-1" /> Block
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Block Task</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <label className="text-sm font-medium mb-2 block">Reason for blocking:</label>
+                            <Textarea 
+                                placeholder="Waiting for API key..." 
+                                value={blockReason} 
+                                onChange={(e) => setBlockReason(e.target.value)}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setIsBlockedDialogOpen(false)}>Cancel</Button>
+                            <Button variant="destructive" onClick={handleBlock} disabled={!blockReason.trim() || isPending}>Block Task</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                 </Dialog>
+
+                 <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-full" onClick={() => unsetCurrentTask(projectId)} title="Put back to Queue">
                      <MoreHorizontal className="w-4 h-4" />
                  </Button>
                  <Button size="lg" className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30" onClick={handleComplete} disabled={isPending}>

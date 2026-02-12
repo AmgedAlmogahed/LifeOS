@@ -131,6 +131,29 @@ export async function toggleSubtask(taskId: string, subtaskId: string, completed
 export async function moveTaskToSprint(taskId: string, sprintId: string | null, projectId: string) {
     const supabase = await createClient();
 
+    // 1. Check for Scope Change if adding to a sprint
+    if (sprintId) {
+        const { data: sprint } = await supabase
+            .from("sprints")
+            .select("id, status, started_at, scope_changes")
+            .eq("id", sprintId)
+            .single();
+
+        if (sprint && sprint.status === "active" && sprint.started_at) {
+            const now = new Date();
+            const startedAt = new Date(sprint.started_at);
+
+            // If sprint started more than a minute ago (buffer), count as scope change
+            if (now.getTime() - startedAt.getTime() > 60000) {
+                const newScopeChanges = (sprint.scope_changes || 0) + 1;
+                await supabase
+                    .from("sprints")
+                    .update({ scope_changes: newScopeChanges })
+                    .eq("id", sprintId);
+            }
+        }
+    }
+
     const { error } = await supabase
         .from("tasks")
         .update({
@@ -138,6 +161,7 @@ export async function moveTaskToSprint(taskId: string, sprintId: string | null, 
             added_to_sprint_at: sprintId ? new Date().toISOString() : null
         })
         .eq("id", taskId);
+
 
     if (error) return { error: error.message };
 
@@ -170,9 +194,9 @@ export async function logTime(taskId: string, minutes: number) {
     return { success: true };
 }
 
-export async function updateTaskStatus(taskId: string, status: string) {
+export async function updateTaskStatus(taskId: string, status: "Todo" | "In Progress" | "Done" | "Blocked") {
     const supabase = await createClient();
-    
+
     const { data: task, error } = await supabase
         .from("tasks")
         .update({ status })

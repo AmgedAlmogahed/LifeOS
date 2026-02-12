@@ -7,6 +7,7 @@ import { Play, CheckSquare, Plus, Loader2 } from "lucide-react";
 import { completeSprint, startSprint } from "@/lib/actions/sprints";
 import { SprintPlanner } from "./SprintPlanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SprintReview } from "./SprintReview";
 
 interface SprintControlProps {
   project: Project;
@@ -17,37 +18,38 @@ interface SprintControlProps {
 export function SprintControl({ project, activeSprint, tasks }: SprintControlProps) {
   const [isPending, startTransition] = useTransition();
   const [showPlanner, setShowPlanner] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   const handleCompleteSprint = () => {
-      // Open detailed completion modal instead?
-      const confirmed = confirm("Complete current active sprint?");
-      if (!confirmed || !activeSprint) return;
-
-      startTransition(async () => {
-          // Calculate metrics locally or server side?
-          // Server side safer.
-          // We just send signal.
-          await completeSprint(activeSprint.id, project.id, { completed_points: 0, completed_task_count: 0 }); // Todo: calculate real metrics
-      });
+      setShowReview(true);
   };
 
   if (activeSprint) {
       return (
-          <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-lg p-3">
-              <div className="flex flex-col">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">Active Sprint</span>
-                  <span className="font-bold">Sprint {activeSprint.sprint_number}</span>
-              </div>
-              <div className="h-8 w-px bg-primary/20" />
-              <div className="flex flex-col text-xs text-muted-foreground">
-                  <span>Started {new Date(activeSprint.started_at).toLocaleDateString()}</span>
-                  <span>Ends {new Date(activeSprint.planned_end_at).toLocaleDateString()}</span>
-              </div>
-              <Button size="sm" variant="outline" className="ml-auto" onClick={handleCompleteSprint} disabled={isPending}>
-                  {isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <CheckSquare className="w-3 h-3 mr-2" />}
-                  Complete Sprint
-              </Button>
-          </div>
+          <>
+            <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <div className="flex flex-col">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">Active Sprint</span>
+                    <span className="font-bold">Sprint {activeSprint.sprint_number}</span>
+                </div>
+                <div className="h-8 w-px bg-primary/20" />
+                <div className="flex flex-col text-xs text-muted-foreground">
+                    <span>Started {new Date(activeSprint.started_at).toLocaleDateString()}</span>
+                    <span>Ends {new Date(activeSprint.planned_end_at).toLocaleDateString()}</span>
+                </div>
+                <Button size="sm" variant="outline" className="ml-auto" onClick={handleCompleteSprint} disabled={isPending}>
+                    {isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <CheckSquare className="w-3 h-3 mr-2" />}
+                    Complete Sprint
+                </Button>
+            </div>
+
+            <SprintReview 
+                sprint={activeSprint}
+                tasks={tasks.filter(t => t.sprint_id === activeSprint.id)}
+                open={showReview}
+                onOpenChange={setShowReview}
+            />
+          </>
       );
   }
 

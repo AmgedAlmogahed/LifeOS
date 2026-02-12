@@ -71,6 +71,12 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
       });
   };
 
+  const totalPoints = tasks
+    .filter(t => selectedTaskIds.has(t.id))
+    .reduce((sum, t) => sum + (t.story_points || 0), 0);
+  
+  const CAPACITY_WARNING = 30; // Simple heuristic for now
+
   return (
     <div className="flex flex-col h-full gap-6 p-1">
         <div className="space-y-4 border-b pb-6">
@@ -99,7 +105,14 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col">
-            <h3 className="font-semibold mb-2 text-sm uppercase tracking-wide text-muted-foreground">Select Tasks</h3>
+            <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Select Tasks</h3>
+                <div className={`text-xs font-bold px-2 py-1 rounded border ${totalPoints > CAPACITY_WARNING ? 'bg-amber-500/10 text-amber-600 border-amber-200' : 'bg-muted text-foreground border-transparent'}`}>
+                    Commitment: {totalPoints} pts
+                    {totalPoints > CAPACITY_WARNING && <span className="ml-1">⚠️ High</span>}
+                </div>
+            </div>
+            
             <div className="flex-1 overflow-y-auto border rounded-lg bg-card/50 p-2 space-y-1">
                 {tasks.filter(t => t.status !== "Done").length === 0 && <div className="p-4 text-center text-muted-foreground italic">No open tasks to add.</div>}
                 

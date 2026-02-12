@@ -8,9 +8,18 @@ export async function createFocusSession(projectId: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    // Check for existing active session? Or allow multiple? Spec implies one focused project.
-    // Spec doesn't strictly forbid multiple, but "Focus Mode" implies single.
-    // For now, simple insert.
+    // Check for existing active session
+    const { data: existingSession } = await supabase
+        .from("focus_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("project_id", projectId)
+        .is("ended_at", null)
+        .maybeSingle();
+
+    if (existingSession) {
+        return existingSession;
+    }
 
     const { data, error } = await supabase.from("focus_sessions").insert({
         project_id: projectId,
@@ -19,6 +28,7 @@ export async function createFocusSession(projectId: string) {
     }).select().single();
 
     if (error) throw error;
+    revalidatePath("/cockpit");
     return data;
 }
 

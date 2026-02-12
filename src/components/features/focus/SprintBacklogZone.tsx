@@ -6,7 +6,15 @@ import { Check, ClipboardList, Clock, ArrowRight, Play } from "lucide-react";
 import { useTransition } from "react";
 import { toggleTaskCurrent, updateTaskStatus } from "@/lib/actions/flow-board"; // Need updateTaskStatus
 
-export function SprintBacklogZone({ tasks, completedTasks, projectId }: { tasks: Task[], completedTasks: Task[], projectId: string }) {
+interface SprintBacklogZoneProps {
+    tasks: Task[];
+    completedTasks: Task[];
+    projectId: string;
+    title?: string;
+    variant?: "sprint" | "backlog";
+}
+
+export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "Backlog", variant = "sprint" }: SprintBacklogZoneProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleStart = (taskId: string) => {

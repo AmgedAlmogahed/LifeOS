@@ -28,6 +28,8 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
             user_id: user.id,
             sprint_number: sprintNumber,
             status: "planning", // Default status
+            planned_end_at: data.planned_end_at!, // Fix property name mismatch
+            started_at: (data.started_at || null) as unknown as string, // Cast to satisfy potential strict type mismatch
         })
         .select()
         .single();
@@ -90,11 +92,59 @@ export async function startSprint(sprintId: string, projectId: string) {
     return updateSprint(sprintId, { status: "active", started_at: new Date().toISOString() });
 }
 
-export async function completeSprint(sprintId: string, projectId: string, metrics: { completed_points: number, completed_task_count: number }) {
-    // Close sprint
+export async function completeSprint(sprintId: string, projectId: string) {
+    const supabase = await createClient();
+
+    // 1. Fetch all tasks in this sprint to calculate metrics
+    const { data: tasks, error: tasksError } = await supabase
+        .from("tasks")
+        .select("status, story_points, time_spent_minutes")
+        .eq("sprint_id", sprintId);
+
+    if (tasksError) return { error: tasksError.message };
+
+    // 2. Calculate metrics
+    const completedTasks = tasks.filter(t => t.status === "Done");
+    const completedPoints = completedTasks.reduce((sum, t) => sum + (t.story_points || 0), 0);
+    const completedTaskCount = completedTasks.length;
+    const focusTimeMinutes = tasks.reduce((sum, t) => sum + (t.time_spent_minutes || 0), 0);
+
+    // 3. Close sprint with calculated metrics
     return updateSprint(sprintId, {
         status: "completed",
         ended_at: new Date().toISOString(),
-        ...metrics
+        completed_points: completedPoints,
+        completed_task_count: completedTaskCount,
+        focus_time_minutes: focusTimeMinutes
     });
+}
+
+export async function cancelSprint(sprintId: string, projectId: string) {
+    const supabase = await createClient();
+
+    // 1. Mark sprint as cancelled
+    const { error: sprintError } = await supabase
+        .from("sprints")
+        .update({ status: "cancelled", ended_at: new Date().toISOString() })
+        .eq("id", sprintId);
+
+    if (sprintError) return { error: sprintError.message };
+
+    // 2. Unassign tasks from the cancelled sprint (optional, but cleaner for backlog)
+    // Or keep them assigned to show history? Spec implies 'cancelled' status on sprint is enough.
+    // But usually tasks should go back to backlog.
+    // Let's clear sprint_id for tasks that are not done?
+    // Spec doesn't explicitly say. "Tasks return to backlog".
+    const { error: tasksError } = await supabase
+        .from("tasks")
+        .update({ sprint_id: null, added_to_sprint_at: null })
+        .eq("sprint_id", sprintId)
+        .neq("status", "Done"); // Keep completed tasks associated? Or clear all? 
+    // Actually, if sprint is cancelled, usually all open tasks go to backlog.
+
+    if (tasksError) return { error: tasksError.message };
+
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/focus/${projectId}`);
+    return { success: true };
 }

@@ -55,7 +55,7 @@ export default async function FocusPage({ params }: { params: Promise<{ projectI
             project={project as Project} 
             activeSprint={activeSprint as Sprint | null} 
             tasks={(tasks || []) as Task[]}
-            initialSession={session as FocusSession | null}
+            activeSession={session as FocusSession | null}
         />
     );
 }

@@ -1,21 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import type { Project, Client, Lifecycle } from "@/types/database";
-import { FolderKanban, Search, ArrowRight, Plus } from "lucide-react";
+import { FolderKanban, Search, ArrowRight, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 import { ProjectForm } from "@/components/forms/project-form";
+import type { Project, Client, Lifecycle, Sprint } from "@/types/database";
 
 const svcColors: Record<string, string> = {
   Cloud: "svc-cloud svc-bg-cloud svc-border-cloud", Web: "svc-web svc-bg-web svc-border-web",
   Design: "svc-design svc-bg-design svc-border-design", Marketing: "svc-marketing svc-bg-marketing svc-border-marketing",
 };
 
-export function ForgeList({ projects, clients, lifecycles }: { projects: Project[]; clients: Pick<Client, "id" | "name" | "brand_primary">[]; lifecycles: Lifecycle[] }) {
+export function ForgeList({ projects, clients, lifecycles, activeSprints = [] }: { 
+    projects: Project[]; 
+    clients: Pick<Client, "id" | "name" | "brand_primary">[]; 
+    lifecycles: Lifecycle[];
+    activeSprints?: Sprint[];
+}) {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c]));
   const lcMap = Object.fromEntries(lifecycles.map((l) => [l.project_id, l]));
+  const sprintMap = Object.fromEntries((activeSprints || []).map(s => [s.project_id, s]));
   const filtered = projects.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -68,6 +74,17 @@ export function ForgeList({ projects, clients, lifecycles }: { projects: Project
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
+                    
+                    {sprintMap[p.id] && (
+                        <div className="mb-3 flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-md px-2 py-1.5">
+                            <Zap className="w-3 h-3 text-primary fill-primary/20" />
+                            <span className="text-xs font-semibold text-foreground">Sprint {sprintMap[p.id].sprint_number}</span>
+                            <span className="text-[10px] text-muted-foreground ml-auto">
+                                Ends {new Date(sprintMap[p.id].planned_end_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric'})}
+                            </span>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-3">
                       <span className={`text-[10px] font-semibold phase-${p.status?.toLowerCase()}`}>{p.status}</span>
                       {lc && <span className="text-[10px] text-muted-foreground">→ {lc.current_stage}</span>}
