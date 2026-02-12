@@ -1,10 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { ProjectDetailClient } from "./project-detail-client";
-import type { Project, Task } from "@/types/database";
+import { ProjectForge } from "./project-forge";
+import type { Project } from "@/types/database";
 
 export const dynamic = "force-dynamic";
-
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,26 +13,33 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: project, error: projectError } = await supabase
+  const { data: project } = await supabase
     .from("projects")
     .select("*")
     .eq("id", id)
-    .single() as { data: Project | null; error: unknown };
+    .single() as { data: Project | null };
 
-  if (projectError || !project) {
+  if (!project) {
     notFound();
   }
 
-  const { data: tasks } = await supabase
+  const tasksRes = await supabase
     .from("tasks")
     .select("*")
     .eq("project_id", id)
-    .order("created_at", { ascending: false }) as { data: Task[] | null };
+    .order("created_at", { ascending: false });
+
+  const assetsRes = await supabase
+    .from("project_assets")
+    .select("*")
+    .eq("project_id", id)
+    .order("created_at", { ascending: false });
 
   return (
-    <ProjectDetailClient
+    <ProjectForge
       project={project}
-      tasks={tasks ?? []}
+      tasks={tasksRes.data ?? []}
+      assets={assetsRes.data ?? []}
     />
   );
 }

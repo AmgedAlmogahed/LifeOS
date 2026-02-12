@@ -4,50 +4,54 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Users,
+  TrendingUp,
+  FileText,
+  Shield,
+  Vault,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Bot,
+  Terminal,
+  Calculator,
+  Beaker,
+  Rocket,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  LayoutDashboard,
-  FolderKanban,
-  CheckSquare,
-  ScrollText,
-  Settings,
-  Terminal,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Zap,
-} from "lucide-react";
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-}
-
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "System Logs", href: "/logs", icon: ScrollText },
+const navItems = [
+  { label: "Command Hub", href: "/dashboard", icon: LayoutDashboard, section: "cockpit" },
+  { label: "Pipeline", href: "/pipeline", icon: TrendingUp, section: "cockpit" },
+  { label: "Clients", href: "/clients", icon: Users, section: "cockpit" },
+  { label: "The Forge", href: "/forge", icon: FolderKanban, section: "operations" },
+  { label: "The Vault", href: "/vault", icon: Vault, section: "operations" },
+  { label: "Generator Lab", href: "/generator", icon: Beaker, section: "operations" },
+  { label: "Deployments", href: "/deployments", icon: Rocket, section: "intel" },
+  { label: "Agent Terminal", href: "/terminal", icon: Bot, section: "intel" },
+  { label: "Guardian", href: "/logs", icon: Shield, section: "intel" },
+  { label: "Leverage", href: "/leverage", icon: Calculator, section: "system" },
 ];
 
-const bottomNavItems: NavItem[] = [
-  { label: "Settings", href: "/settings", icon: Settings },
-];
+const sectionLabels: Record<string, string> = {
+  cockpit: "Cockpit",
+  operations: "Operations",
+  intel: "Intelligence",
+  system: "System",
+};
 
 export function AppSidebar() {
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
   const supabase = createClient();
 
   const handleLogout = async () => {
@@ -56,167 +60,129 @@ export function AppSidebar() {
     router.refresh();
   };
 
-  const isActive = (href: string) => pathname.startsWith(href);
+  const sections = ["cockpit", "operations", "intel", "system"];
 
   return (
     <aside
       className={cn(
-        "relative flex flex-col h-screen bg-zinc-950 border-r border-white/[0.06] transition-all duration-300 ease-in-out",
-        collapsed ? "w-[68px]" : "w-[260px]"
+        "h-screen flex flex-col border-r border-border bg-sidebar transition-all duration-300 shrink-0",
+        collapsed ? "w-[60px]" : "w-[230px]"
       )}
     >
-      {/* ─── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 h-16 shrink-0">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/10">
-          <Terminal className="w-4.5 h-4.5 text-blue-400" />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <h2 className="text-sm font-bold text-white tracking-tight truncate">
-              Life OS
-            </h2>
-            <p className="text-[10px] text-zinc-500 font-mono truncate">
-              COMMAND CENTER
-            </p>
+      {/* ─── Header ──────────────────────────────────────────────────── */}
+      <div className="h-14 flex items-center px-3.5 border-b border-border shrink-0">
+        {!collapsed ? (
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/25 to-chart-3/15 border border-primary/20 flex items-center justify-center">
+              <Terminal className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <span className="text-sm font-bold gradient-text tracking-tight">
+                Venture OS
+              </span>
+              <span className="block text-[10px] text-muted-foreground leading-none mt-0.5">
+                Sovereign Foundation
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/25 to-chart-3/15 border border-primary/20 flex items-center justify-center mx-auto">
+            <Terminal className="w-4 h-4 text-primary" />
           </div>
         )}
       </div>
 
-      <Separator className="bg-white/[0.06]" />
-
-      {/* ─── Navigation ─────────────────────────────────────────────────────── */}
-      <ScrollArea className="flex-1 py-3">
-        <nav className="space-y-1 px-2">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
-            const linkContent = (
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
-                  active
-                    ? "bg-gradient-to-r from-blue-500/15 to-violet-500/10 text-white shadow-lg shadow-blue-500/5"
-                    : "text-zinc-400 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <item.icon
-                  className={cn(
-                    "w-[18px] h-[18px] shrink-0 transition-colors",
-                    active
-                      ? "text-blue-400"
-                      : "text-zinc-500 group-hover:text-zinc-300"
-                  )}
-                />
-                {!collapsed && (
-                  <>
-                    <span className="truncate">{item.label}</span>
-                    {active && (
-                      <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                    )}
-                  </>
-                )}
-              </Link>
-            );
-
-            if (collapsed) {
-              return (
-                <Tooltip key={item.href} delayDuration={0}>
-                  <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                  <TooltipContent side="right" className="bg-zinc-800 text-white border-white/10">
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
-
-            return <div key={item.href}>{linkContent}</div>;
-          })}
-        </nav>
-      </ScrollArea>
-
-      {/* ─── Bottom Section ─────────────────────────────────────────────────── */}
-      <div className="mt-auto border-t border-white/[0.06] pt-2 pb-3 px-2 space-y-1">
-        {/* Agent Status Indicator */}
-        <div
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-lg",
-            collapsed ? "justify-center" : ""
-          )}
-        >
-          <div className="relative">
-            <Zap className="w-4 h-4 text-emerald-400" />
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-          </div>
-          {!collapsed && (
-            <div>
-              <p className="text-[11px] font-medium text-zinc-300">
-                Son of Anton
-              </p>
-              <p className="text-[10px] text-emerald-400/80 font-mono">
-                ONLINE
-              </p>
-            </div>
-          )}
-        </div>
-
-        {bottomNavItems.map((item) => {
-          const active = isActive(item.href);
-          const linkContent = (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
-                active
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+      {/* ─── Navigation ──────────────────────────────────────────────── */}
+      <nav className="flex-1 overflow-y-auto py-2.5 px-2">
+        {sections.map((section) => {
+          const items = navItems.filter((i) => i.section === section);
+          return (
+            <div key={section} className="mb-3">
+              {!collapsed && (
+                <div className="px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground/60 tracking-[0.15em] uppercase">
+                  {sectionLabels[section]}
+                </div>
               )}
-            >
-              <item.icon className="w-[18px] h-[18px] shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
+              {collapsed && <div className="h-px bg-border mx-2 my-2" />}
+              <div className="space-y-0.5 mt-0.5">
+                {items.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const Icon = item.icon;
+
+                  const linkContent = (
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[13px] transition-all duration-200",
+                        collapsed && "justify-center px-0",
+                        isActive
+                          ? "bg-primary/10 text-primary border border-primary/15 shadow-sm shadow-primary/5"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent"
+                      )}
+                    >
+                      <Icon className={cn("w-[15px] h-[15px] shrink-0", isActive && "text-primary")} />
+                      {!collapsed && (
+                        <span className="truncate font-medium">{item.label}</span>
+                      )}
+                    </Link>
+                  );
+
+                  if (collapsed) {
+                    return (
+                      <Tooltip key={item.href} delayDuration={0}>
+                        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                        <TooltipContent side="right" sideOffset={8}>{item.label}</TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+                  return <div key={item.href}>{linkContent}</div>;
+                })}
+              </div>
+            </div>
           );
-
-          if (collapsed) {
-            return (
-              <Tooltip key={item.href} delayDuration={0}>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                <TooltipContent side="right" className="bg-zinc-800 text-white border-white/10">
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
-
-          return <div key={item.href}>{linkContent}</div>;
         })}
+      </nav>
 
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all duration-200 w-full",
-            collapsed ? "justify-center" : ""
-          )}
-        >
-          <LogOut className="w-[18px] h-[18px] shrink-0" />
-          {!collapsed && <span>Logout</span>}
+      {/* ─── Agent Status ────────────────────────────────────────────── */}
+      <div className="px-3 py-2 border-t border-border shrink-0">
+        {!collapsed ? (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-accent/40">
+            <Bot className="w-4 h-4 text-muted-foreground" />
+            <span className="text-[11px] text-muted-foreground font-medium">Son of Anton</span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 status-blink" />
+              <span className="text-[10px] text-emerald-500/80">Active</span>
+            </div>
+          </div>
+        ) : (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <div className="flex justify-center py-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 status-blink" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>Agent: Active</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* ─── Footer ──────────────────────────────────────────────────── */}
+      <div className="px-2 py-2 border-t border-border flex items-center gap-1 shrink-0">
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button onClick={handleLogout} className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>Logout</TooltipContent>
+        </Tooltip>
+        <div className="flex-1" />
+        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
-
-      {/* ─── Collapse Toggle ────────────────────────────────────────────────── */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-zinc-800 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-700 shadow-lg z-50"
-      >
-        {collapsed ? (
-          <ChevronRight className="w-3 h-3" />
-        ) : (
-          <ChevronLeft className="w-3 h-3" />
-        )}
-      </Button>
     </aside>
   );
 }
