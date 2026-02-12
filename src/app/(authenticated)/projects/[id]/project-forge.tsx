@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { Project, Task, ProjectAsset, MeetingMinutes, Invoice } from "@/types/database";
+import type { Project, Task, ProjectAsset, MeetingMinutes, Invoice, Sprint } from "@/types/database";
+import { SprintControl } from "@/components/features/sprints/SprintControl";
 import { createClient } from "@/lib/supabase/client";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { convertOutcomeToTask } from "@/lib/actions/meetings";
@@ -65,9 +66,10 @@ interface ProjectForgeProps {
   assets: ProjectAsset[];
   minutes: MeetingMinutes[];
   invoices: Invoice[];
+  activeSprint: Sprint | null;
 }
 
-export function ProjectForge({ project, tasks, assets, minutes, invoices }: ProjectForgeProps) {
+export function ProjectForge({ project, tasks, assets, minutes, invoices, activeSprint }: ProjectForgeProps) {
   const router = useRouter();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -363,6 +365,8 @@ export function ProjectForge({ project, tasks, assets, minutes, invoices }: Proj
               {completedTasks}/{tasks.length} tasks · {taskProgress}%
             </span>
           </div>
+          
+          <SprintControl project={project} activeSprint={activeSprint} tasks={tasks} />
 
           {/* Progress Bar */}
           <div className="h-1.5 bg-accent rounded-full overflow-hidden">

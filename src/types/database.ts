@@ -43,6 +43,7 @@ export type Opportunity = T<"opportunities">;
 export type PriceOffer = T<"price_offers">;
 export type Contract = T<"contracts">;
 export type Project = T<"projects">;
+export type Sprint = T<"sprints">;
 export type ProjectAsset = T<"project_assets">;
 export type Task = T<"tasks">;
 export type AuditLog = T<"audit_logs">;
@@ -72,6 +73,7 @@ export type OpportunityInsert = TI<"opportunities">;
 export type PriceOfferInsert = TI<"price_offers">;
 export type ContractInsert = TI<"contracts">;
 export type ProjectInsert = TI<"projects">;
+export type SprintInsert = TI<"sprints">;
 export type TaskInsert = TI<"tasks">;
 export type AuditLogInsert = TI<"audit_logs">;
 export type GuardianRuleInsert = TI<"guardian_rules">;
@@ -89,6 +91,7 @@ export type CommunicationLogInsert = TI<"communication_logs">;
 export type ClientUpdate = TU<"clients">;
 export type OpportunityUpdate = TU<"opportunities">;
 export type ProjectUpdate = TU<"projects">;
+export type SprintUpdate = TU<"sprints">;
 export type TaskUpdate = TU<"tasks">;
 export type FocusSessionUpdate = TU<"focus_sessions">;
 export type DailyPlanUpdate = TU<"daily_plans">;
@@ -114,4 +117,10 @@ export interface StageHistoryEntry {
     stage: LifecycleStage;
     entered_at: string;
     exited_at?: string;
+}
+
+export interface Subtask {
+    id: string;
+    title: string;
+    completed: boolean;
 }

@@ -556,6 +556,7 @@ Reason = the dominant factor (e.g., "deadline in 5 days")
 - [ ] Task migration (carry forward unfinished)
 - [ ] Contextual top bar (replaces sidebar entirely)
 - [ ] Inbox refactor (captures + unplanned tasks)
+- [ ] Sprint system (per-project 1-2 week cycles with goal, backlog, scope protection, velocity tracking) — see SPRINTS-SPEC.md
 
 ### Phase 2 — Business Engine Polish (Weeks 5-8)
 **Goal:** Client lifecycle and financial tracking work seamlessly within the focus/cockpit model.

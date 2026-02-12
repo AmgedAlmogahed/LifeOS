@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { ProjectForge } from "./project-forge";
-import type { Project } from "@/types/database";
+import type { Project, Sprint } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +47,14 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
+  // Add Sprint Fetch
+  const { data: activeSprint } = await supabase
+    .from("sprints")
+    .select("*")
+    .eq("project_id", id)
+    .eq("status", "active")
+    .maybeSingle();
+
   return (
     <ProjectForge
       project={project}
@@ -54,6 +62,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       assets={assetsRes.data ?? []}
       minutes={minutesRes.data ?? []}
       invoices={(invoicesRes.data as any[]) ?? []}
+      activeSprint={activeSprint as Sprint | null}
     />
   );
 }
