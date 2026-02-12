@@ -138,7 +138,7 @@ export function LogicEngine({ tasks, projects }: LogicEngineProps) {
                           >
                             {taskStatusIcon[task.status]}
                             <span className="text-sm text-foreground truncate flex-1">{task.title}</span>
-                            <span className="text-xs text-muted-foreground/60">{projectMap[task.project_id] ?? "—"}</span>
+                            <span className="text-xs text-muted-foreground/60">{projectMap[task.project_id ?? ""] ?? "—"}</span>
                             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${typeStyle}`}>
                               {task.type}
                             </span>
@@ -153,7 +153,7 @@ export function LogicEngine({ tasks, projects }: LogicEngineProps) {
                           {isExpanded && (
                             <div className="px-3.5 pb-3.5 border-t border-border/50">
                               <div className="mt-3 grid grid-cols-4 gap-3">
-                                <InfoBlock label="Project" value={projectMap[task.project_id] ?? "—"} />
+                                <InfoBlock label="Project" value={projectMap[task.project_id ?? ""] ?? "—"} />
                                 <InfoBlock label="Priority" value={task.priority} />
                                 <InfoBlock label="Type" value={task.type} />
                                 <InfoBlock label="Due" value={task.due_date ?? "—"} />
