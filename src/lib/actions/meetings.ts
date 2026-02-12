@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 export async function createMeeting(meeting: MeetingMinutesInsert) {
     const supabase = await createClient();
-    const { data, error } = await supabase.from("meeting_minutes").insert(meeting).select().single();
+    const { data, error } = await (supabase.from("meeting_minutes") as any).insert(meeting).select().single();
     if (error) throw error;
     revalidatePath(`/projects/${meeting.project_id}`);
     return data;
@@ -24,7 +24,7 @@ export async function convertOutcomeToTask(outcome: string, projectId: string) {
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week default
     };
 
-    const { data, error } = await supabase.from("tasks").insert(task).select().single();
+    const { data, error } = await (supabase.from("tasks") as any).insert(task).select().single();
     if (error) throw error;
 
     // Optionally link back to meeting via metadata?
@@ -35,6 +35,6 @@ export async function convertOutcomeToTask(outcome: string, projectId: string) {
 
 export async function updateMeeting(id: string, update: MeetingMinutesUpdate) {
     const supabase = await createClient();
-    const { error } = await supabase.from("meeting_minutes").update(update).eq("id", id);
+    const { error } = await (supabase.from("meeting_minutes") as any).update(update).eq("id", id);
     if (error) throw error;
 }

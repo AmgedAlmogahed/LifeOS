@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 export async function createInvoice(invoice: InvoiceInsert) {
     const supabase = await createClient();
-    const { data, error } = await supabase.from("invoices").insert(invoice).select().single();
+    const { data, error } = await (supabase.from("invoices") as any).insert(invoice).select().single();
     if (error) throw error;
     revalidatePath("/finance");
     return data;
@@ -16,8 +16,7 @@ export async function createInvoiceFromPriceOffer(offerId: string) {
     const supabase = await createClient();
 
     // 1. Fetch Offer
-    const { data: offer, error: offerError } = await supabase
-        .from("price_offers")
+    const { data: offer, error: offerError } = await (supabase.from("price_offers") as any)
         .select("*")
         .eq("id", offerId)
         .single();
@@ -35,19 +34,18 @@ export async function createInvoiceFromPriceOffer(offerId: string) {
         // Table `projects` doesn't link to `opportunity`.
         // But `contracts` link to `price_offer`.
         // Let's check if there is a contract for this offer.
-        const { data: contract } = await supabase
-            .from("contracts")
+        const { data: contract } = await (supabase.from("contracts") as any)
             .select("id")
             .eq("price_offer_id", offerId)
             .single();
 
         if (contract) {
-            const { data: proj } = await supabase.from("projects").select("id").eq("contract_id", contract.id).single();
+            const { data: proj } = await (supabase.from("projects") as any).select("id").eq("contract_id", contract.id).single();
             if (proj) projectId = proj.id;
         }
     }
 
-    const { data: invoice, error } = await supabase.from("invoices").insert({
+    const { data: invoice, error } = await (supabase.from("invoices") as any).insert({
         client_id: offer.client_id,
         project_id: projectId, // null if not found
         amount: offer.total_value,
@@ -63,7 +61,7 @@ export async function createInvoiceFromPriceOffer(offerId: string) {
 
 export async function updateInvoice(id: string, update: InvoiceUpdate) {
     const supabase = await createClient();
-    const { error } = await supabase.from("invoices").update(update).eq("id", id);
+    const { error } = await (supabase.from("invoices") as any).update(update).eq("id", id);
     if (error) throw error;
     revalidatePath("/finance");
 }
@@ -72,16 +70,16 @@ export async function recordPayment(payment: PaymentInsert) {
     const supabase = await createClient();
 
     // 1. Insert Payment
-    const { error } = await supabase.from("payments").insert(payment);
+    const { error } = await (supabase.from("payments") as any).insert(payment);
     if (error) throw error;
 
     // 2. Check totals
-    const { data: payments } = await supabase.from("payments").select("amount").eq("invoice_id", payment.invoice_id);
-    const totalPaid = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+    const { data: payments } = await (supabase.from("payments") as any).select("amount").eq("invoice_id", payment.invoice_id);
+    const totalPaid = payments?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0;
 
-    const { data: invoice } = await supabase.from("invoices").select("amount").eq("id", payment.invoice_id).single();
+    const { data: invoice } = await (supabase.from("invoices") as any).select("amount").eq("id", payment.invoice_id).single();
     if (invoice && totalPaid >= Number(invoice.amount)) {
-        await supabase.from("invoices").update({ status: "Paid" }).eq("id", payment.invoice_id);
+        await (supabase.from("invoices") as any).update({ status: "Paid" }).eq("id", payment.invoice_id);
     }
 
     revalidatePath("/finance");
