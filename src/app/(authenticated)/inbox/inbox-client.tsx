@@ -1,140 +1,140 @@
 "use client";
 
 import { useState } from "react";
-import { Task } from "@/types/database";
-import { 
-  CheckCircle2, Circle, AlertCircle, Calendar, Tag, Briefcase, 
-  User, Users, GraduationCap, LayoutGrid, CheckSquare, Pause
-} from "lucide-react";
-import { updateTask } from "@/lib/actions/tasks";
-import { useRouter } from "next/navigation";
-import { formatDistanceToNow, isPast, parseISO } from "date-fns";
+import { QuickCapture, Task } from "@/types/database";
+import { processCapture, dismissCapture } from "@/lib/actions/captures";
+import { createTask, updateTask } from "@/lib/actions/tasks";
+import { Check, X, ArrowRight, Trash2, Calendar, Folder } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
-const taskStatusIcon: Record<string, React.ReactNode> = {
-  Todo: <Circle className="w-4 h-4 text-muted-foreground" />,
-  "In Progress": <AlertCircle className="w-4 h-4 text-amber-500" />,
-  Done: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-  Blocked: <Pause className="w-4 h-4 text-red-500" />,
-};
+interface InboxClientProps {
+    initialCaptures: QuickCapture[];
+    initialTasks: Task[];
+    projects: { id: string; name: string }[];
+}
 
-const categoryIcon: Record<string, React.ReactNode> = {
-  Business: <Briefcase className="w-3 h-3" />,
-  Personal: <User className="w-3 h-3" />,
-  Social: <Users className="w-3 h-3" />,
-  Research: <GraduationCap className="w-3 h-3" />,
-  Habit: <CheckSquare className="w-3 h-3" />,
-};
+export function InboxClient({ initialCaptures, initialTasks, projects }: InboxClientProps) {
+    const [captures, setCaptures] = useState(initialCaptures); // Ideally rely on server state via router refresh
+    // For simplicity, just render initial props. Server actions revalidatePath refreshes the page.
+    // But optimistic updates are better.
+    
+    const [selectedCapture, setSelectedCapture] = useState<QuickCapture | null>(null);
+    const [targetProjectId, setTargetProjectId] = useState<string | null>(null);
 
-type TaskWithProject = Task & { projects?: { id: string; name: string } | null };
+    async function onDismiss(id: string) {
+        // Optimistic remove?
+        await dismissCapture(id);
+    }
+    
+    async function onConvertToTask() {
+        if (!selectedCapture) return;
+        
+        // Create task
+        const newTask = await createTask({
+            title: selectedCapture.raw_text,
+            project_id: targetProjectId, // null means Personal
+            status: "Todo",
+            priority: "Medium",
+            type: "Implementation",
+            is_recurring: false,
+            reminder_sent: false,
+            // category: category based on project?
+            // defaults
+        } as any); // Cast to TaskInsert to ignore missing fields if any
+        
+        // Mark capture as processed
+        await processCapture(selectedCapture.id, newTask.id);
+        
+        setSelectedCapture(null);
+        setTargetProjectId(null);
+    }
 
-const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+    return (
+        <div className="container max-w-4xl py-8 px-4 space-y-8">
+            <h1 className="text-2xl font-bold mb-6">Inbox</h1>
 
-export function InboxClient({ initialTasks }: { initialTasks: TaskWithProject[] }) {
-  const router = useRouter();
-  const [filter, setFilter] = useState<"all" | "today" | "upcoming">("all");
+            {/* Unprocessed Captures */}
+            <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                    Unprocessed Captures ({initialCaptures.length})
+                </h2>
+                
+                <div className="space-y-3">
+                    {initialCaptures.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic"> Inbox zero. Nice work.</p>
+                    ) : (
+                        initialCaptures.map(capture => (
+                            <div key={capture.id} className="group bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:shadow-sm transition-all">
+                                <div className="flex-1 mr-4">
+                                    <p className="text-foreground">{capture.raw_text}</p>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        Captured {formatDistanceToNow(new Date(capture.created_at))} ago via {capture.source}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button size="sm" variant="outline" onClick={() => setSelectedCapture(capture)}>
+                                        <ArrowRight className="w-4 h-4 mr-1" /> Task
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={() => onDismiss(capture.id)}>
+                                        <X className="w-4 h-4 text-muted-foreground hover:text-red-500 transition-colors" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </section>
 
-  const sortedTasks = [...initialTasks].sort((a, b) => {
-      // Sort by status (Done at bottom)
-      if (a.status === "Done" && b.status !== "Done") return 1;
-      if (a.status !== "Done" && b.status === "Done") return -1;
-      
-      // Sort by Priority
-      const pA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 99;
-      const pB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 99;
-      if (pA !== pB) return pA - pB;
-      
-      // Sort by Date
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-  });
-
-  const handleToggle = async (task: Task) => {
-      const newStatus = task.status === "Done" ? "Todo" : "Done";
-      try {
-          // Optimistic update?
-          // For simplicity, wait for server action revalidate
-          await updateTask(task.id, { status: newStatus });
-      } catch (e) {
-          console.error(e);
-          alert("Failed to update task");
-      }
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="h-14 border-b border-border flex items-center px-6 shrink-0 bg-card/40 backdrop-blur-sm">
-        <LayoutGrid className="w-4 h-4 mr-3 text-primary" />
-        <h1 className="font-semibold text-foreground">Universal Inbox</h1>
-        <div className="ml-auto flex gap-2">
-            <select 
-                value={filter} 
-                onChange={(e) => setFilter(e.target.value as any)}
-                className="bg-transparent text-xs font-medium text-muted-foreground focus:outline-none cursor-pointer"
-            >
-                <option value="all">All Tasks</option>
-                {/* Could implement filtering logic if needed */}
-            </select>
-        </div>
-      </div>
-
-      {/* Task List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-2">
-        {sortedTasks.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm">No tasks found. Get to work!</div>
-        ) : (
-            sortedTasks.map(task => (
-                <div key={task.id} className={`group flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border/60 hover:bg-accent/30 transition-all ${task.status === "Done" ? "opacity-50" : ""}`}>
-                    
-                    {/* Checkbox */}
-                    <button onClick={() => handleToggle(task)} className="mt-0.5 shrink-0 hover:scale-110 transition-transform">
-                        {taskStatusIcon[task.status]}
-                    </button>
-
-                    <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-medium truncate ${task.status === "Done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                            {task.title}
+            {/* Unplanned Tasks */}
+            <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+                    <Folder className="w-4 h-4" /> Unplanned Tasks ({initialTasks.length})
+                </h2>
+                 <div className="space-y-3">
+                    {initialTasks.map(task => (
+                        <div key={task.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between">
+                             <div className="flex items-center gap-3">
+                                 <div className={`w-3 h-3 rounded-full border ${task.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-muted-foreground'}`} />
+                                 <span className={task.status === 'Done' ? 'line-through text-muted-foreground' : ''}>{task.title}</span>
+                             </div>
+                             {/* Project assignment logic could be here too */}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                            {/* Project or Category */}
-                            {task.projects ? (
-                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                    <Briefcase className="w-3 h-3" />
-                                    {task.projects.name}
-                                </span>
-                            ) : task.category ? (
-                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent text-muted-foreground">
-                                    {categoryIcon[task.category] ?? <Tag className="w-3 h-3" />}
-                                    {task.category}
-                                </span>
-                            ) : null}
+                    ))}
+                 </div>
+            </section>
 
-                            {/* Priority Badge */}
-                            <span className={`px-1.5 py-0.5 rounded border ${
-                                task.priority === "Critical" ? "border-red-500/30 text-red-500 bg-red-500/10" :
-                                task.priority === "High" ? "border-amber-500/30 text-amber-500 bg-amber-500/10" :
-                                "border-transparent text-muted-foreground/60"
-                            }`}>
-                                {task.priority}
-                            </span>
-                            
-                            {/* Due Date */}
-                            {task.is_recurring && <span className="flex items-center gap-1 text-blue-400"><CheckSquare className="w-3 h-3" /> Recurring</span>}
-                            
-                            {task.due_date && (
-                                <span className={`flex items-center gap-1 ${isPast(parseISO(task.due_date)) && task.status !== "Done" ? "text-red-400 font-bold" : ""}`}>
-                                    <Calendar className="w-3 h-3" />
-                                    {formatDistanceToNow(parseISO(task.due_date), { addSuffix: true })}
-                                </span>
-                            )}
+            {/* Convert Modal */}
+            <Dialog open={!!selectedCapture} onOpenChange={(o) => !o && setSelectedCapture(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Convert to Task</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <p className="font-medium">"{selectedCapture?.raw_text}"</p>
+                        
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Assign Project</label>
+                            <select 
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                onChange={(e) => setTargetProjectId(e.target.value || null)}
+                                value={targetProjectId || ""}
+                            >
+                                <option value="">Personal (No Project)</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button variant="ghost" onClick={() => setSelectedCapture(null)}>Cancel</Button>
+                            <Button onClick={onConvertToTask}>Convert</Button>
                         </div>
                     </div>
-                </div>
-            ))
-        )}
-      </div>
-    </div>
-  );
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
 }

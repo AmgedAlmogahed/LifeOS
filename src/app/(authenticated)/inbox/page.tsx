@@ -1,18 +1,30 @@
 import { createClient } from "@/lib/supabase/server";
+import { getUnprocessedCaptures } from "@/lib/actions/captures";
 import { InboxClient } from "./inbox-client";
 
-export const dynamic = "force-dynamic";
-
 export default async function InboxPage() {
-  const supabase = await createClient();
-  const { data: tasks, error } = await (supabase.from("tasks") as any)
-    .select(`*, projects:project_id(id, name)`)
-    .order("due_date", { ascending: true, nullsFirst: false });
+    const supabase = await createClient();
+    
+    // Fetch captures
+    const captures = await getUnprocessedCaptures();
+    
+    // Fetch unplanned tasks
+    const { data: unplannedTasks } = await supabase.from("tasks")
+        .select("*")
+        .is("project_id", null)
+        .neq("status", "Done")
+        .order("created_at", { ascending: false });
 
-  if (error) {
-      console.error(error);
-      return <div>Error loading inbox</div>;
-  }
+    // Fetch active projects for dropdown in client
+    const { data: projects } = await supabase.from("projects")
+         .select("id, name")
+         .in("status", ['Document', 'Freeze', 'Implement', 'Verify']);
 
-  return <InboxClient initialTasks={(tasks || []) as any} />;
+    return (
+        <InboxClient 
+            initialCaptures={captures || []} 
+            initialTasks={unplannedTasks || []}
+            projects={projects || []}
+        />
+    );
 }

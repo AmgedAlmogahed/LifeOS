@@ -20,6 +20,75 @@ export type DeployEnv = "Vercel" | "Railway" | "Alibaba" | "AWS" | "Other";
 export type ProjectCategory = "Business" | "Personal" | "Social" | "Research";
 export type TaskCategory = "Business" | "Personal" | "Social" | "Research" | "Habit";
 
+// ─── Focus Sessions ──────────────────────────────────────────────────────
+
+export interface FocusSession {
+    id: string;
+    project_id: string;
+    user_id: string;
+    started_at: string;
+    ended_at: string | null;
+    session_notes: string | null;
+    tasks_completed: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export type FocusSessionInsert = Omit<FocusSession, "id" | "created_at" | "updated_at">;
+export type FocusSessionUpdate = Partial<Omit<FocusSession, "id" | "created_at" | "updated_at">>;
+
+// ─── Daily Plans ─────────────────────────────────────────────────────────
+
+export interface DailyPlan {
+    id: string;
+    plan_date: string;
+    user_id: string;
+    reflection_notes: string | null;
+    plan_notes: string | null;
+    ai_recommendation_text: string | null;
+    is_completed: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export type DailyPlanInsert = Omit<DailyPlan, "id" | "created_at" | "updated_at">;
+export type DailyPlanUpdate = Partial<Omit<DailyPlan, "id" | "created_at" | "updated_at">>;
+
+// ─── Quick Captures ──────────────────────────────────────────────────────
+
+export type CaptureSource = 'web' | 'telegram' | 'voice' | 'agent';
+export type CaptureStatus = 'captured' | 'processed' | 'dismissed';
+
+export interface QuickCapture {
+    id: string;
+    user_id: string;
+    raw_text: string;
+    source: CaptureSource;
+    status: CaptureStatus;
+    created_task_id: string | null;
+    processed_at: string | null;
+    created_at: string;
+}
+
+export type QuickCaptureInsert = Omit<QuickCapture, "id" | "created_at" | "processed_at">;
+export type QuickCaptureUpdate = Partial<Omit<QuickCapture, "id" | "created_at">>;
+
+// ─── Health Snapshots ────────────────────────────────────────────────────
+
+export type HealthDimension = 'financial' | 'business' | 'operations' | 'personal';
+
+export interface HealthSnapshot {
+    id: string;
+    user_id: string;
+    snapshot_date: string;
+    dimension: HealthDimension;
+    score: number;
+    components: Record<string, number> | null;
+    created_at: string;
+}
+
+export type HealthSnapshotInsert = Omit<HealthSnapshot, "id" | "created_at">;
+
 // ─── Core Row Types ──────────────────────────────────────────────────────────
 
 export interface Client {
@@ -191,6 +260,15 @@ export interface Task {
     reminder_sent: boolean;
     metadata: Record<string, unknown> | null;
     agent_context: Record<string, unknown> | null;
+
+    // Phase 1 Ritual Fields
+    committed_date: string | null;
+    migrated_from: string | null;
+    delegated_to: string | null;
+    delegation_status: string | null;
+    delegation_notes: string | null;
+    completed_at: string | null;
+
     created_at: string;
     updated_at: string;
 }
@@ -343,6 +421,10 @@ export interface Database {
             projects: { Row: Project; Insert: ProjectInsert; Update: ProjectUpdate };
             project_assets: { Row: ProjectAsset; Insert: Omit<ProjectAsset, "id" | "created_at">; Update: Partial<Omit<ProjectAsset, "id" | "created_at">> };
             tasks: { Row: Task; Insert: TaskInsert; Update: TaskUpdate };
+            focus_sessions: { Row: FocusSession; Insert: FocusSessionInsert; Update: FocusSessionUpdate };
+            daily_plans: { Row: DailyPlan; Insert: DailyPlanInsert; Update: DailyPlanUpdate };
+            quick_captures: { Row: QuickCapture; Insert: QuickCaptureInsert; Update: QuickCaptureUpdate };
+            health_snapshots: { Row: HealthSnapshot; Insert: HealthSnapshotInsert; Update: never };
             audit_logs: { Row: AuditLog; Insert: AuditLogInsert; Update: never };
             system_config: { Row: SystemConfig; Insert: Omit<SystemConfig, "created_at" | "updated_at">; Update: Partial<Omit<SystemConfig, "created_at" | "updated_at">> };
             guardian_rules: { Row: GuardianRule; Insert: GuardianRuleInsert; Update: Partial<Omit<GuardianRule, "id" | "created_at" | "updated_at">> };
