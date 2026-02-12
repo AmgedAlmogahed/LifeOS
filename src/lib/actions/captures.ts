@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { QuickCaptureInsert } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
-export async function createCapture(capture: QuickCaptureInsert) {
+type CreateCaptureInput = Omit<QuickCaptureInsert, "user_id" | "created_task_id"> & { created_task_id?: string | null };
+
+export async function createCapture(capture: CreateCaptureInput) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser(); // or auth.getUser() returns {data: {user}}
 
@@ -12,8 +14,9 @@ export async function createCapture(capture: QuickCaptureInsert) {
 
     const { error } = await supabase.from("quick_captures").insert({
         ...capture,
-        user_id: user?.id
-    });
+        user_id: user?.id,
+        created_task_id: capture.created_task_id ?? null
+    } as any); // Cast to ignore strict Insert type mismatch if any
 
     if (error) throw error;
     revalidatePath("/inbox");

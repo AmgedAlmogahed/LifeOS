@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { createCapture } from "@/lib/actions/captures";
 import { Plus, ArrowRight } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast"; // Assuming toast exists
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface QuickCaptureModalProps {
@@ -17,7 +17,6 @@ interface QuickCaptureModalProps {
 export function QuickCaptureModal({ isOpen, onClose }: QuickCaptureModalProps) {
     const [text, setText] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const { toast } = useToast();
 
     async function handleSubmit(e?: React.FormEvent) {
         e?.preventDefault();
@@ -31,17 +30,14 @@ export function QuickCaptureModal({ isOpen, onClose }: QuickCaptureModalProps) {
                 status: 'captured'
             });
             setText("");
-            toast({
-                title: "Captured ✓",
+            toast.success("Captured", {
                 description: "Added to your inbox.",
             });
             onClose();
         } catch (error) {
             console.error(error);
-            toast({
-                title: "Error",
+            toast.error("Error", {
                 description: "Failed to capture. Please try again.",
-                variant: "destructive",
             });
         } finally {
             setIsSubmitting(false);

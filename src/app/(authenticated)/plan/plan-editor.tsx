@@ -5,7 +5,7 @@ import { DailyPlan } from "@/types/database";
 import { updateDailyPlan, completeDailyPlan } from "@/lib/actions/daily-plans";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Check, Loader2, Save } from "lucide-react";
 
 interface PlanEditorProps {
@@ -17,7 +17,6 @@ export function PlanEditor({ initialPlan }: PlanEditorProps) {
     const [reflection, setReflection] = useState(plan.reflection_notes || "");
     const [planNotes, setPlanNotes] = useState(plan.plan_notes || "");
     const [isSaving, setIsSaving] = useState(false);
-    const { toast } = useToast();
 
     async function handleSave() {
         setIsSaving(true);
@@ -26,9 +25,9 @@ export function PlanEditor({ initialPlan }: PlanEditorProps) {
                 reflection_notes: reflection,
                 plan_notes: planNotes
             });
-            toast({ title: "Saved", description: "Your plan is updated." });
+            toast.success("Saved", { description: "Your plan is updated." });
         } catch (error) {
-            toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
+            toast.error("Error", { description: "Failed to save." });
         } finally {
             setIsSaving(false);
         }
@@ -38,7 +37,7 @@ export function PlanEditor({ initialPlan }: PlanEditorProps) {
         await handleSave();
         try {
             await completeDailyPlan(plan.id);
-            toast({ title: "Completed", description: "Good night!" });
+            toast.success("Completed", { description: "Good night!" });
             // Redirect or show success state?
         } catch (error) {
            // ...
