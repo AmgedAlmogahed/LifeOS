@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { QuickAddTaskBtn } from "@/components/features/quick-add-task";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -98,6 +99,9 @@ export function AppSidebar() {
         )}
       </div>
 
+      <div className="px-3" suppressHydrationWarning>
+        <QuickAddTaskBtn collapsed={collapsed} />
+      </div>
       {/* ─── Navigation ──────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2.5 px-2">
         {sections.map((section) => {

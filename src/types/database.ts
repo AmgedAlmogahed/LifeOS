@@ -17,6 +17,8 @@ export type OfferStatus = "Draft" | "Sent" | "Accepted" | "Rejected" | "Expired"
 export type ContractStatus = "Draft" | "Pending Signature" | "Active" | "Completed" | "Terminated";
 export type LifecycleStage = "Requirements" | "Building" | "Testing" | "Deploying" | "Maintenance";
 export type DeployEnv = "Vercel" | "Railway" | "Alibaba" | "AWS" | "Other";
+export type ProjectCategory = "Business" | "Personal" | "Social" | "Research";
+export type TaskCategory = "Business" | "Personal" | "Social" | "Research" | "Habit";
 
 // ─── Core Row Types ──────────────────────────────────────────────────────────
 
@@ -97,6 +99,7 @@ export interface Project {
     name: string;
     description: string;
     status: ProjectStatus;
+    category: ProjectCategory;
     progress: number;
     is_frozen: boolean;
     specs_md: string;
@@ -176,12 +179,16 @@ export interface ProjectAsset {
 
 export interface Task {
     id: string;
-    project_id: string;
+    project_id: string | null;
+    category: TaskCategory | null;
     title: string;
     status: TaskStatus;
     priority: TaskPriority;
     type: TaskType;
     due_date: string | null;
+    is_recurring: boolean;
+    recurrence_rule: string | null;
+    reminder_sent: boolean;
     metadata: Record<string, unknown> | null;
     agent_context: Record<string, unknown> | null;
     created_at: string;

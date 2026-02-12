@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { Client, Opportunity, Contract, Project, Deployment, AgentReport, LeverageLog } from "@/types/database";
+import type { Client, Opportunity, Contract, Project, Deployment, AgentReport, LeverageLog, Task } from "@/types/database";
 import {
   DollarSign, TrendingUp, Users, FolderKanban, Zap, AlertTriangle,
-  ArrowRight, Bot, Rocket, Activity, Shield, Clock,
+  ArrowRight, Bot, Rocket, Activity, Shield, Clock, Briefcase, User, Calendar
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -48,10 +48,11 @@ interface CommandHubProps {
   deployments: Deployment[];
   agentReports: AgentReport[];
   leverageLogs: LeverageLog[];
+  tasks: Task[];
 }
 
 export function CommandHub({
-  clients, opportunities, contracts, projects, deployments, agentReports, leverageLogs,
+  clients, opportunities, contracts, projects, deployments, agentReports, leverageLogs, tasks
 }: CommandHubProps) {
   const activeContracts = contracts.filter((c) => c.status === "Active");
   const activeRevenue = activeContracts.reduce((s, c) => s + Number(c.total_value), 0);
@@ -66,8 +67,14 @@ export function CommandHub({
     .reduce((s, l) => s + Number(l.hours_saved), 0);
   const unresolvedReports = agentReports.filter((r) => !r.is_resolved);
 
+  // Life at a Glance Logic
+  const activeBusinessProjects = projects.filter(p => p.category === "Business" && p.status !== "Verify");
+  const businessTasks = tasks.filter(t => t.category === "Business");
+  const personalTasks = tasks.filter(t => t.category === "Personal" || t.category === "Habit");
+  const socialTasks = tasks.filter(t => t.category === "Social");
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background/50">
       {/* ═══ TOP BAR ════════════════════════════════════════════════════ */}
       <div className="h-14 border-b border-border flex items-center px-6 bg-card/40 backdrop-blur-sm shrink-0">
         <Activity className="w-4 h-4 text-primary mr-2" />
@@ -128,6 +135,28 @@ export function CommandHub({
             sub={currency(weekHours * 100) + " saved"}
             accent="var(--color-gold)"
           />
+        </div>
+        
+        {/* ─── Life at a Glance Widget ───────────────────────────── */}
+        <div className="grid grid-cols-3 gap-4">
+            <LifeWidget 
+                icon={<Briefcase className="w-4 h-4 text-blue-400" />}
+                title="Business"
+                subtitle={`${activeBusinessProjects.length} Active Projects`}
+                items={businessTasks.slice(0, 3)}
+            />
+            <LifeWidget 
+                icon={<User className="w-4 h-4 text-emerald-400" />}
+                title="Personal"
+                subtitle="Life Maintenance"
+                items={personalTasks.slice(0, 3)}
+            />
+            <LifeWidget 
+                icon={<Users className="w-4 h-4 text-purple-400" />}
+                title="Social"
+                subtitle="Upcoming Events"
+                items={socialTasks.slice(0, 3)}
+            />
         </div>
 
         {/* ─── Main Grid ───────────────────────────────────────────── */}
@@ -300,4 +329,28 @@ function HealthBadge({ score }: { score: number }) {
   return (
     <span className={`text-[10px] font-semibold ${cls}`}>{score}% health</span>
   );
+}
+
+function LifeWidget({ icon, title, subtitle, items }: { icon: any, title: string, subtitle: string, items: Task[] }) {
+    return (
+        <div className="glass-card p-4 flex flex-col h-full">
+            <div className="flex items-center gap-2 mb-1">
+                {icon}
+                <span className="text-sm font-semibold text-foreground">{title}</span>
+            </div>
+            <div className="text-xs text-muted-foreground mb-3">{subtitle}</div>
+            
+            <div className="space-y-2 flex-1">
+                {items.length === 0 ? (
+                    <div className="text-[10px] text-muted-foreground/40 italic">Nothing scheduled.</div>
+                ) : items.map(t => (
+                    <div key={t.id} className="flex items-center gap-2 text-xs text-foreground/80">
+                        <div className={`w-1.5 h-1.5 rounded-full ${t.priority === 'Critical' ? 'bg-red-500' : 'bg-primary/50'} shrink-0`} />
+                        <span className="truncate flex-1">{t.title}</span>
+                        {t.due_date && <span className="text-[10px] text-muted-foreground shrink-0">{new Date(t.due_date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</span>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
 }
