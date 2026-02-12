@@ -262,7 +262,7 @@ export function CommandHub({
                     <div className="flex items-center gap-3 mb-2.5">
                       <div
                         className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white"
-                        style={{ background: client.brand_primary }}
+                        style={{ background: client.brand_primary ?? undefined }}
                       >
                         {client.name.charAt(0).toUpperCase()}
                       </div>

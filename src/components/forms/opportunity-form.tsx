@@ -60,7 +60,7 @@ export function OpportunityForm({ open, onClose, clients, editOpp }: Props) {
         </Field>
 
         <Field label="Description" name="description">
-          <TextArea name="description" placeholder="Scope and context..." defaultValue={editOpp?.description} />
+          <TextArea name="description" placeholder="Scope and context..." defaultValue={editOpp?.description ?? ""} />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">

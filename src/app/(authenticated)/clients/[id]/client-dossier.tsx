@@ -138,7 +138,7 @@ export function ClientDossier({
               <div className="flex gap-2">
                 {[client.brand_primary, client.brand_secondary, client.brand_accent].map((c, i) => (
                   <div key={i} className="flex-1">
-                    <div className="h-8 rounded-lg border border-border/30" style={{ background: c }} />
+                    <div className="h-8 rounded-lg border border-border/30" style={{ background: c ?? undefined }} />
                     <div className="text-[9px] text-muted-foreground/50 font-mono mt-1 text-center">{c}</div>
                   </div>
                 ))}

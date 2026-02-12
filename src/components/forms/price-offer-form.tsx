@@ -44,7 +44,7 @@ export function PriceOfferForm({ open, onClose, clients, opportunities, editOffe
   const isEdit = !!editOffer;
 
   const [items, setItems] = useState<LineItem[]>(
-    editOffer?.items ?? [{ name: "", service_type: "Web", description: "", quantity: 1, unit_price: 0, total: 0 }]
+    (editOffer?.items as unknown as LineItem[]) ?? [{ name: "", service_type: "Web", description: "", quantity: 1, unit_price: 0, total: 0 }]
   );
 
   function addItem() {
@@ -165,7 +165,7 @@ export function PriceOfferForm({ open, onClose, clients, opportunities, editOffe
         </div>
 
         <Field label="Notes" name="notes">
-          <TextArea name="notes" placeholder="Additional terms..." defaultValue={editOffer?.notes} />
+          <TextArea name="notes" placeholder="Additional terms..." defaultValue={editOffer?.notes ?? ""} />
         </Field>
 
         {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>}

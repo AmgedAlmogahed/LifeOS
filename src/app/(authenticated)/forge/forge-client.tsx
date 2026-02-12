@@ -56,7 +56,7 @@ export function ForgeList({ projects, clients, lifecycles }: { projects: Project
                   <div className="glass-card p-5 group cursor-pointer">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border border-border/30"
-                        style={client ? { background: `${client.brand_primary}18`, color: client.brand_primary } : { background: "oklch(0.20 0.01 285)" }}>
+                        style={client ? { background: `${client.brand_primary ?? '#6366f1'}18`, color: client.brand_primary ?? undefined } : { background: "oklch(0.20 0.01 285)" }}>
                         {p.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">

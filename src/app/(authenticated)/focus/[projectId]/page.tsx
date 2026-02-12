@@ -3,9 +3,10 @@ import { getActiveFocusSession } from "@/lib/actions/focus-sessions";
 import { FocusController } from "./focus-controller";
 import { notFound } from "next/navigation";
 
-export default async function FocusPage({ params }: { params: { projectId: string } }) {
+export default async function FocusPage({ params }: { params: Promise<{ projectId: string }> }) {
+    const { projectId } = await params;
     const supabase = await createClient();
-    const { data: project } = await supabase.from("projects").select("*").eq("id", params.projectId).single();
+    const { data: project } = await supabase.from("projects").select("*").eq("id", projectId).single();
     
     if (!project) return notFound();
 

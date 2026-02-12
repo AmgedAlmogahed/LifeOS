@@ -71,11 +71,11 @@ export function ContractForm({ open, onClose, clients, editContract }: Props) {
         </div>
 
         <Field label="PDF URL" name="pdf_url">
-          <TextInput name="pdf_url" placeholder="https://..." defaultValue={editContract?.pdf_url} />
+          <TextInput name="pdf_url" placeholder="https://..." defaultValue={editContract?.pdf_url ?? ""} />
         </Field>
 
         <Field label="Terms (Markdown)" name="terms_md">
-          <TextArea name="terms_md" rows={6} placeholder="# Contract Terms\n\n..." defaultValue={editContract?.terms_md} />
+          <TextArea name="terms_md" rows={6} placeholder="# Contract Terms\n\n..." defaultValue={editContract?.terms_md ?? ""} />
         </Field>
 
         {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>}

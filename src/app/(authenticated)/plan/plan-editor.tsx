@@ -84,7 +84,7 @@ export function PlanEditor({ initialPlan }: PlanEditorProps) {
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                     Save Draft
                 </Button>
-                <Button onClick={handleComplete} disabled={isSaving || plan.is_completed}>
+                <Button onClick={handleComplete} disabled={isSaving || (plan.is_completed ?? false)}>
                     <Check className="w-4 h-4 mr-2" />
                     {plan.is_completed ? "Completed" : "Complete & Close Day"}
                 </Button>

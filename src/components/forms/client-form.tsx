@@ -44,35 +44,35 @@ export function ClientForm({ open, onClose, editClient }: Props) {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Email" name="email">
-            <TextInput name="email" type="email" placeholder="hello@acme.com" defaultValue={editClient?.email} />
+            <TextInput name="email" type="email" placeholder="hello@acme.com" defaultValue={editClient?.email ?? ""} />
           </Field>
           <Field label="Phone" name="phone">
-            <TextInput name="phone" placeholder="+1 555 000 0000" defaultValue={editClient?.phone} />
+            <TextInput name="phone" placeholder="+1 555 000 0000" defaultValue={editClient?.phone ?? ""} />
           </Field>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="Brand Primary" name="brand_primary">
-            <ColorInput name="brand_primary" defaultValue={editClient?.brand_primary || "#6366f1"} />
+            <ColorInput name="brand_primary" defaultValue={editClient?.brand_primary ?? "#6366f1"} />
           </Field>
           <Field label="Brand Secondary" name="brand_secondary">
-            <ColorInput name="brand_secondary" defaultValue={editClient?.brand_secondary || "#8b5cf6"} />
+            <ColorInput name="brand_secondary" defaultValue={editClient?.brand_secondary ?? "#8b5cf6"} />
           </Field>
           <Field label="Brand Accent" name="brand_accent">
-            <ColorInput name="brand_accent" defaultValue={editClient?.brand_accent || "#06b6d4"} />
+            <ColorInput name="brand_accent" defaultValue={editClient?.brand_accent ?? "#06b6d4"} />
           </Field>
         </div>
 
         <Field label="Logo URL" name="logo_url">
-          <TextInput name="logo_url" placeholder="https://..." defaultValue={editClient?.logo_url} />
+          <TextInput name="logo_url" placeholder="https://..." defaultValue={editClient?.logo_url ?? ""} />
         </Field>
 
         <Field label="Brand Assets URL" name="brand_assets_url">
-          <TextInput name="brand_assets_url" placeholder="https://drive.google.com/..." defaultValue={editClient?.brand_assets_url} />
+          <TextInput name="brand_assets_url" placeholder="https://drive.google.com/..." defaultValue={editClient?.brand_assets_url ?? ""} />
         </Field>
 
         <Field label="Notes" name="notes">
-          <TextArea name="notes" placeholder="Internal notes about this client..." defaultValue={editClient?.notes} />
+          <TextArea name="notes" placeholder="Internal notes about this client..." defaultValue={editClient?.notes ?? ""} />
         </Field>
 
         {error && <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>}
