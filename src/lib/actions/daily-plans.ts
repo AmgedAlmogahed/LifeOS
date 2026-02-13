@@ -9,20 +9,13 @@ export async function getOrCreateDailyPlan(planDate: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { data: existing } = await supabase.from("daily_plans")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("plan_date", planDate)
-        .maybeSingle();
-
-    if (existing) return existing;
-
-    // Insert requires all non-omitted fields if type is strict.
-    // Casting to any to bypass strict insert requirement for nullable/default fields
-    const { data, error } = await (supabase.from("daily_plans") as any).insert({
+    const { data, error } = await (supabase.from("daily_plans") as any).upsert({
         user_id: user.id,
         plan_date: planDate,
-        is_completed: false // default
+        is_completed: false
+    }, {
+        onConflict: 'user_id,plan_date',
+        ignoreDuplicates: false
     }).select().single();
 
     if (error) throw error;

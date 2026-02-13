@@ -1,4 +1,5 @@
 "use server";
+// TODO: GAP-11 - Consider adding toast "Task added to sprint (+1 scope change)" when moveTaskToSprint is called during active sprint
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -186,6 +187,26 @@ export async function logTime(taskId: string, minutes: number) {
     const { error } = await supabase
         .from("tasks")
         .update({ time_spent_minutes: newTotal })
+        .eq("id", taskId);
+
+    if (error) return { error: error.message };
+
+    if (task.project_id) revalidatePath(`/focus/${task.project_id}`);
+    return { success: true };
+}
+
+export async function skipTask(taskId: string) {
+    const supabase = await createClient();
+
+    // Read current skip_count
+    const { data: task } = await supabase.from("tasks").select("skip_count, project_id").eq("id", taskId).single();
+    if (!task) return { error: "Task not found" };
+
+    const newCount = (task.skip_count || 0) + 1;
+
+    const { error } = await supabase
+        .from("tasks")
+        .update({ skip_count: newCount, is_current: false })
         .eq("id", taskId);
 
     if (error) return { error: error.message };

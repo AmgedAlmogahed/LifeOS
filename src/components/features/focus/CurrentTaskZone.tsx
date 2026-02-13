@@ -3,9 +3,9 @@
 import { useState, useEffect, useTransition } from "react";
 import { Task, FocusSession } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Clock, MoreHorizontal, Plus, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, Clock, SkipForward, Plus, AlertCircle } from "lucide-react";
 import { updateTask } from "@/lib/actions/tasks";
-import { addSubtask, toggleSubtask, logTime, unsetCurrentTask, toggleTaskCurrent } from "@/lib/actions/flow-board";
+import { addSubtask, toggleSubtask, logTime, unsetCurrentTask, toggleTaskCurrent, skipTask } from "@/lib/actions/flow-board";
 import { getNextTask } from "@/lib/actions/flow-board-next";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -111,14 +111,14 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
             <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
 
-        <div className="flex justify-between items-start mb-6">
-            <div className="space-y-1">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+            <div className="space-y-1 min-w-0 flex-1">
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">Current Focus</span>
-                <h2 className="text-2xl font-bold leading-tight">{task.title}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold leading-tight">{task.title}</h2>
             </div>
-            
-            <div className="flex items-center gap-2">
-                 <div className="text-right mr-4 hidden md:block">
+
+            <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                 <div className="text-right mr-2 hidden md:block">
                      <div className="text-xs text-muted-foreground uppercase tracking-wider">Time Spent</div>
                      <div className="font-mono text-xl font-medium">
                          {Math.floor((task.time_spent_minutes || 0) + (elapsed / 60))}m
@@ -151,8 +151,26 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
                     </DialogContent>
                  </Dialog>
 
-                 <Button size="sm" variant="outline" className="h-9 w-9 p-0 rounded-full" onClick={() => unsetCurrentTask(projectId)} title="Put back to Queue">
-                     <MoreHorizontal className="w-4 h-4" />
+                 <Button
+                     size="sm"
+                     variant="outline"
+                     className="h-9 px-3 text-muted-foreground hover:text-foreground"
+                     onClick={() => {
+                         startTransition(async () => {
+                             await skipTask(task.id);
+                             const { task: nextTask } = await getNextTask(projectId, task.id);
+                             if (nextTask) {
+                                 await toggleTaskCurrent(nextTask.id, projectId);
+                                 toast.info("Task skipped", { description: `Next: ${nextTask.title}` });
+                             } else {
+                                 toast.info("Task skipped — no more tasks in queue.");
+                             }
+                         });
+                     }}
+                     disabled={isPending}
+                     title="Skip to next task"
+                 >
+                     <SkipForward className="w-4 h-4 mr-1" /> Skip
                  </Button>
                  <Button size="lg" className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30" onClick={handleComplete} disabled={isPending}>
                      <CheckCircle2 className="w-5 h-5 mr-2" /> Complete

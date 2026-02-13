@@ -28,7 +28,9 @@ export async function createFocusSession(projectId: string) {
     }).select().single();
 
     if (error) throw error;
-    revalidatePath("/cockpit");
+    // Note: no revalidatePath here — this function is called during server component
+    // render (via getOrCreateSession in page.tsx). Next.js 16 forbids revalidation
+    // during render. The cockpit will see the new session on next navigation.
     return data;
 }
 
@@ -41,6 +43,52 @@ export async function endFocusSession(sessionId: string, notes: string | null) {
 
     if (error) throw error;
     revalidatePath("/cockpit");
+}
+
+/**
+ * Close any sessions that were left open from a previous day.
+ * This handles the case where a user closes the browser without ending their session.
+ */
+export async function cleanupStaleSessions(projectId: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Find active sessions that started before today
+    const { data: staleSessions } = await supabase
+        .from("focus_sessions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("project_id", projectId)
+        .is("ended_at", null)
+        .lt("started_at", todayStart.toISOString());
+
+    if (staleSessions && staleSessions.length > 0) {
+        const staleIds = staleSessions.map(s => s.id);
+        await supabase
+            .from("focus_sessions")
+            .update({ ended_at: todayStart.toISOString(), session_notes: "Auto-closed: stale session from previous day" })
+            .in("id", staleIds);
+    }
+}
+
+/**
+ * The main entry point for Focus page load.
+ * Philosophy: entering Focus page IS starting a session.
+ * 1. Clean up stale sessions from previous days
+ * 2. Return existing active session if one exists
+ * 3. Create a new session if none exists
+ */
+export async function getOrCreateSession(projectId: string) {
+    // Step 1: Clean up any leftover sessions from previous days
+    await cleanupStaleSessions(projectId);
+
+    // Step 2: Check for existing active session (reuse createFocusSession which is already idempotent)
+    const session = await createFocusSession(projectId);
+    return session;
 }
 
 export async function getActiveFocusSession(projectId: string) {

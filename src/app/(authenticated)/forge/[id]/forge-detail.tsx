@@ -4,13 +4,13 @@ import Link from "next/link";
 import type { Project, Task, ProjectAsset, Lifecycle, Client, LifecycleStage } from "@/types/database";
 import {
   ArrowLeft, CheckCircle2, Clock, AlertTriangle, Circle, ExternalLink,
-  Github, Figma, Database, FileText, ListChecks, Lock, Unlock,
+  Github, Figma, Database, FileText, ListChecks, Lock, Unlock, XCircle,
 } from "lucide-react";
 
 const stageOrder: LifecycleStage[] = ["Requirements", "Building", "Testing", "Deploying", "Maintenance"];
 const stageIcon: Record<string, string> = { Requirements: "📋", Building: "🔨", Testing: "🧪", Deploying: "🚀", Maintenance: "🔧" };
-const statusIcon = { "Todo": Circle, "In Progress": Clock, "Done": CheckCircle2, "Blocked": AlertTriangle };
-const statusColor = { "Todo": "text-muted-foreground", "In Progress": "text-primary", "Done": "text-emerald-400", "Blocked": "text-red-400" };
+const statusIcon = { "Todo": Circle, "In Progress": Clock, "Done": CheckCircle2, "Blocked": AlertTriangle, "Cancelled": XCircle };
+const statusColor = { "Todo": "text-muted-foreground", "In Progress": "text-primary", "Done": "text-emerald-400", "Blocked": "text-red-400", "Cancelled": "text-muted-foreground/50" };
 const priorityColor = { Critical: "text-red-400 bg-red-400/10", High: "text-amber-400 bg-amber-400/10", Medium: "text-blue-400 bg-blue-400/10", Low: "text-muted-foreground bg-accent" };
 const assetIcons: Record<string, React.ReactNode> = {
   github: <Github className="w-4 h-4" />, figma: <Figma className="w-4 h-4" />,

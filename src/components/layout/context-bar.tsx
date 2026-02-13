@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Moon, Inbox, Plus, ArrowLeft, Home, Zap } from "lucide-react";
+import { Moon, Inbox, Plus, ArrowLeft, Home, Zap, CalendarCheck } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +57,11 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                 {/* Plan Link (only in Cockpit) */}
                 {mode === 'cockpit' && (
                     <Link href="/plan" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
-                        <Moon className="w-4 h-4" />
+                        {new Date().getHours() >= 18 ? (
+                            <Moon className="w-4 h-4 text-indigo-400" />
+                        ) : (
+                            <CalendarCheck className="w-4 h-4" />
+                        )}
                         <span className="hidden sm:inline">Plan</span>
                     </Link>
                 )}

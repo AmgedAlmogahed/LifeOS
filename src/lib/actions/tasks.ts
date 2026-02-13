@@ -42,3 +42,16 @@ export async function deleteTask(id: string) {
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
 }
+
+export async function commitTasks(taskIds: string[], date: string) {
+    const supabase = await createClient();
+    const { error } = await (supabase.from("tasks") as any)
+        .update({ committed_date: date })
+        .in("id", taskIds);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard");
+    revalidatePath("/plan");
+    revalidatePath("/focus");
+}

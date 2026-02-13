@@ -1,9 +1,8 @@
 "use server";
+// TODO: GAP-14 (P3) — Smarter next-task scoring (skip_count penalty, priority weighting, deadline proximity)
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-
-// ... existing imports ...
 
 export async function getNextTask(projectId: string, currentTaskId: string) {
     const supabase = await createClient();

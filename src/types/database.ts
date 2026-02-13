@@ -12,7 +12,7 @@ export type { Tables, TablesInsert, TablesUpdate, Enums, CompositeTypes } from "
 
 // ─── Convenience Enum Types ────────────────────────────────────────────────
 export type ProjectStatus = "Backlog" | "Understand" | "Document" | "Freeze" | "Implement" | "Verify";
-export type TaskStatus = "Todo" | "In Progress" | "Done" | "Blocked";
+export type TaskStatus = "Todo" | "In Progress" | "Done" | "Blocked" | "Cancelled";
 export type TaskPriority = "Critical" | "High" | "Medium" | "Low";
 export type TaskType = "Architectural" | "Implementation" | "Audit" | "Maintenance";
 export type AuditLevel = "Critical" | "Warning" | "Info";

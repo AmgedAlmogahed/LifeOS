@@ -92,8 +92,36 @@ export async function startSprint(sprintId: string, projectId: string) {
     return updateSprint(sprintId, { status: "active", started_at: new Date().toISOString() });
 }
 
-export async function completeSprint(sprintId: string, projectId: string) {
+export async function completeSprint(
+    sprintId: string,
+    projectId: string,
+    taskDecisions?: { carryForward: string[]; backlog: string[]; drop: string[] }
+) {
     const supabase = await createClient();
+
+    // Handle task decisions before metrics calculation
+    if (taskDecisions) {
+        // Backlog: set sprint_id = null
+        if (taskDecisions.backlog.length > 0) {
+            await supabase.from("tasks")
+                .update({ sprint_id: null, added_to_sprint_at: null })
+                .in("id", taskDecisions.backlog);
+        }
+
+        // Drop: set status = 'Cancelled'
+        if (taskDecisions.drop.length > 0) {
+            await supabase.from("tasks")
+                .update({ status: "Cancelled" })
+                .in("id", taskDecisions.drop);
+        }
+
+        // Carry-forward: set sprint_id = null (ready for next sprint planning)
+        if (taskDecisions.carryForward.length > 0) {
+            await supabase.from("tasks")
+                .update({ sprint_id: null, added_to_sprint_at: null })
+                .in("id", taskDecisions.carryForward);
+        }
+    }
 
     // 1. Fetch all tasks in this sprint to calculate metrics
     const { data: tasks, error: tasksError } = await supabase

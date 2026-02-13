@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { FlowBoard } from "@/components/features/focus/FlowBoard";
 import { Project, Task, Sprint, FocusSession } from "@/types/database";
+import { getOrCreateSession } from "@/lib/actions/focus-sessions";
 
 export default async function FocusPage({ params }: { params: Promise<{ projectId: string }> }) {
     const { projectId } = await params;
@@ -13,10 +14,14 @@ export default async function FocusPage({ params }: { params: Promise<{ projectI
         .select("*")
         .eq("id", projectId)
         .single();
-    
+
     if (!project) return notFound();
 
-    // 2. Fetch Active Sprint
+    // 2. Auto-create focus session (entering Focus page IS starting a session)
+    // This also cleans up stale sessions from previous days
+    const session = await getOrCreateSession(projectId);
+
+    // 3. Fetch Active Sprint
     const { data: activeSprint } = await supabase
         .from("sprints")
         .select("*")
@@ -24,17 +29,7 @@ export default async function FocusPage({ params }: { params: Promise<{ projectI
         .eq("status", "active")
         .maybeSingle();
 
-    // 3. Fetch Tasks
-    // We want all tasks that are:
-    // - NOT Done
-    // - OR Done within last 24h
-    // This allows Flow Board to organize them into Current, Queue, Backlog.
-    // If sprint is active, backlog will be sprint backlog.
-    // Non-sprint tasks will be hidden or in a separate list? 
-    // FlowBoard logic filters based on sprint_id. So if we fetch *all*, we rely on client filtering.
-    // But for performance, maybe we should fetch only sprint tasks + current?
-    // Let's stick to fetching all relevant tasks for now.
-    
+    // 4. Fetch Tasks (not Done, or Done within last 24h for DoneRibbon)
     const { data: tasks } = await supabase
         .from("tasks")
         .select("*")
@@ -42,20 +37,12 @@ export default async function FocusPage({ params }: { params: Promise<{ projectI
         .or(`status.neq.Done,completed_at.gt.${new Date(Date.now() - 86400000).toISOString()}`)
         .order("created_at", { ascending: false });
 
-    // 4. Fetch Active Focus Session
-    const { data: session } = await supabase
-        .from("focus_sessions")
-        .select("*")
-        .eq("project_id", projectId)
-        .is("ended_at", null)
-        .maybeSingle();
-
     return (
-        <FlowBoard 
-            project={project as Project} 
-            activeSprint={activeSprint as Sprint | null} 
+        <FlowBoard
+            project={project as Project}
+            activeSprint={activeSprint as Sprint | null}
             tasks={(tasks || []) as Task[]}
-            activeSession={session as FocusSession | null}
+            activeSession={session as FocusSession}
         />
     );
 }

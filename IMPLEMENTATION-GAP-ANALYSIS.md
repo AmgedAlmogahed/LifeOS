@@ -1,9 +1,10 @@
-# LifeOS — Implementation Gap Analysis
+# LifeOS — Implementation Gap Analysis (v2 — Verified)
 
 > **Date:** February 12, 2026
+> **Last Verified:** February 12, 2026
 > **Purpose:** Identify every gap between the approved specs and the current implementation
 > **Specs Audited:** PHASE1-UX-SPEC.md, SPRINTS-SPEC.md, TASK-VIEW-SPEC.md
-> **Verdict:** ~70% implemented. Critical gaps in Evening Plan, AI Recommendation, and Focus Session lifecycle.
+> **Verdict:** ~85% implemented. Major wins on Evening Plan and AI Recommendation. Remaining gaps are in Focus Session lifecycle, Sprint Review UX, and visual polish.
 
 ---
 
@@ -15,126 +16,68 @@ Each gap is categorized by severity:
 - **P1 — High**: Feature exists but is a stub or fundamentally incomplete.
 - **P2 — Medium**: Feature partially works but missing important spec behaviors.
 - **P3 — Low**: Polish, edge case, or "build later" item from spec.
-
-For each gap:
-- **Spec Reference**: Which spec section defines the expected behavior
-- **Current State**: What the code actually does right now
-- **File(s)**: Exact files that need changes
-- **Remediation**: Specific instructions for what to implement
+- **RESOLVED**: Previously identified gap that has been fixed.
 
 ---
 
-## P0 — Critical Gaps
+## RESOLVED Gaps (Previously Identified, Now Fixed)
 
-### GAP-01: Evening Plan is Gutted (2 textareas vs 5-section ritual)
+### ~~GAP-01: Evening Plan~~ — RESOLVED
 
-**Spec Reference:** PHASE1-UX-SPEC.md Section 6.1
+The Plan page now has all 5 sections properly composed:
 
-**Current State:** `plan-editor.tsx` contains only 2 textareas (reflection + plan notes) and a save/complete button. The spec defines a 5-section ritual that is the emotional heart of the system.
+1. **TodayReview** — `src/components/features/plan/TodayReview.tsx`: 3 stat cards (completed tasks, in-progress, focus time) fetched server-side
+2. **Daily Reflection** — Textarea for wins and lessons learned
+3. **CaptureTriage** — `src/components/features/plan/CaptureTriage.tsx`: Inline capture processing with dismiss and convert-to-task dialog (project assignment)
+4. **AIRecommendation** — `src/components/features/plan/AIRecommendation.tsx`: Shows recommended project with Accept/Edit buttons, saves to `ai_recommendation_text`
+5. **TaskCommitment** — `src/components/features/plan/TaskCommitment.tsx`: Per-project task checkboxes, calls `commitTasks()` to set `committed_date`
+6. **Closing Thoughts** — Textarea for tomorrow's focus
 
-**File:** `src/app/(authenticated)/plan/plan-editor.tsx`
-
-**What's Missing (all 4 sections below):**
-
-#### Section 1 — Today's Review
-The spec shows:
-```
-📊 TODAY'S REVIEW
-✅ 5 tasks completed | 📝 2 in progress | ⏱️ 6h 45m focus time
-```
-**Remediation:** On `/plan` page load, fetch today's completed tasks (`tasks WHERE status='Done' AND completed_at::date = today`), in-progress tasks, and total focus session time (`SUM(ended_at - started_at) FROM focus_sessions WHERE started_at::date = today`). Display as a summary banner at the top before any textareas. This is read-only — not editable. It grounds the user in reality before planning.
-
-#### Section 2 — AI Recommendation for Tomorrow
-The spec shows:
-```
-✨ AI RECOMMENDATION FOR TOMORROW
-Morning: Project Alpha (deadline in 4 days)
-Afternoon: Project Beta (continue payment flow)
-[Accept] [Edit]
-```
-**Remediation:** Call `generateRecommendation()` on page load (see GAP-02 for fixing the algorithm). Display the recommendation with Accept/Edit buttons. When accepted, store in `daily_plans.ai_recommendation_text`. Currently this field exists in the schema and the component shows it if present, but it's never populated.
-
-#### Section 3 — Task Commitment for Tomorrow
-The spec shows tasks grouped by project with checkboxes:
-```
-📋 TASK COMMITMENT FOR TOMORROW
-┌─ Morning (Project Alpha) ────────────────┐
-│ □ Session storage integration             │
-│ □ Logout endpoint                         │
-└───────────────────────────────────────────┘
-```
-**Remediation:** This is the most important missing section. Fetch all active projects and their uncompleted tasks. Let the user check tasks they commit to for tomorrow. On check, set `tasks.committed_date = tomorrow's date`. The `committed_date` column already exists in the schema (added in Phase 1 migration) but is NEVER used in any UI. Group committed tasks by project.
-
-#### Section 4 — Capture Triage
-The spec shows inline capture processing:
-```
-📥 CAPTURE TRIAGE (3 items)
-"Help brother with printer"
-[→ Task] [→ Personal] [💼 Delegate] [✕ Dismiss]
-```
-**Remediation:** Fetch unprocessed captures (`getUnprocessedCaptures()`) and display them inline in the Plan page — NOT as a separate Inbox visit. The inbox page can still exist as a standalone, but the Plan must include a capture triage section. The `inbox-client.tsx` already has this UI; extract it into a reusable `CaptureTriage` component and embed it in the Plan editor.
-
-**Component Spec from PHASE1-UX-SPEC.md Section 13:**
-```
-Plan Components:
-- TodayReview
-- AIRecommendation
-- TaskCommitment
-- CaptureTriage
-```
-All four components should be created and composed inside `plan-editor.tsx`.
+**Data flow:** `page.tsx` fetches stats, recommendation, captures, and projects with tasks in parallel. All passed to `PlanEditor` which composes the sections.
 
 ---
 
-### GAP-02: AI Recommendation is a Stub
+### ~~GAP-02: AI Recommendation~~ — RESOLVED
 
-**Spec Reference:** PHASE1-UX-SPEC.md Section 11.4, SPRINTS-SPEC.md Section 7.3
+`src/lib/actions/recommendations.ts` now implements the full scoring algorithm:
 
-**Current State:** `recommendations.ts` lines 23-24:
-```typescript
-// TODO: Implement full scoring algorithm based on tasks deadlines and focus sessions
-// For now, return the most recently updated active project.
-```
-It just returns `projects[0]` (most recently updated). No scoring.
-
-**File:** `src/lib/actions/recommendations.ts`
-
-**Remediation:** Implement the scoring algorithm from the spec:
-
-```
-Base Score (PHASE1-UX-SPEC):
-  daysUntilDeadline * 40%
-  + overdueTaskCount * 20%
-  + daysSinceLastSession * 20%
-  + blockedTaskCount * 10%
-  + urgentComms * 10%
-
-Updated Score (SPRINTS-SPEC — if sprint exists):
-  daysUntilDeadline * 30%
-  + sprintProgressVsTime * 25%
-  + overdueTaskCount * 15%
-  + daysSinceLastSession * 15%
-  + blockedTaskCount * 10%
-  + urgentComms * 5%
-```
-
-For each active project:
-1. Query `tasks` for overdue count (due_date < today, status != Done)
-2. Query `focus_sessions` for days since last session
-3. Query `tasks` for blocked count
-4. Query project deadline (from lifecycle or project record)
-5. If sprint exists, calculate sprint progress ratio vs time elapsed ratio
-6. Score and rank. Return the highest.
-
-The reason string should be specific: "Nokhbat deadline in 5 days, 3 overdue tasks" — not generic "Recently active project."
+- Fetches active projects with contracts, tasks, focus sessions, and sprints in parallel
+- Scores each project using weighted factors:
+  - **Without sprint**: Deadline 40%, Overdue 20%, Session recency 20%, Blocked 10%
+  - **With active sprint**: Deadline 30%, Sprint progress 25%, Overdue 15%, Session 15%, Blocked 10%
+- Returns specific reason strings: "Deadline in 5 days, 3 overdue tasks"
+- Falls back to most recent project only if all scores are 0
 
 ---
+
+### ~~GAP-04: Task Committed Date~~ — RESOLVED
+
+- `commitTasks()` action in `tasks.ts` sets `committed_date` on selected tasks
+- `TaskCommitment` component lets users check tasks per project for tomorrow
+- `FlowBoard.tsx` filters Zone 2 tasks by `committed_date === today` OR `status === 'In Progress'`
+- Already-committed tasks show "ALREADY COMMITTED" badge and are disabled
+
+---
+
+### ~~GAP-10: Capture Triage in Plan~~ — RESOLVED
+
+`CaptureTriage` component is extracted and embedded in the Plan editor (conditionally shown when captures > 0). Includes dismiss and convert-to-task with project assignment dialog.
+
+---
+
+### ~~GAP-17: Task Time Tracking~~ — RESOLVED
+
+`CurrentTaskZone.tsx` logs time every 60 seconds via `logTime(taskId, 1)`. The `logTime()` action in `flow-board.ts` persists to `time_spent_minutes` column. Timer auto-increments while task is current.
+
+---
+
+## P0 — Critical Gaps (Still Open)
 
 ### GAP-03: Focus Sessions Don't Auto-Start/End
 
 **Spec Reference:** PHASE1-UX-SPEC.md Section 5.2
 
-**Current State:** `focus-controller.tsx` requires manual "Start Session" button click. When the user navigates away, the session stays "active" with no end time.
+**Current State:** `focus-controller.tsx` renders a "Ready to Focus?" prompt with a manual "Start Session" button. When the user navigates away, the session stays "active" with no end time. No `beforeunload` listener exists anywhere in the codebase.
 
 **Spec says:**
 ```
@@ -143,99 +86,80 @@ Load /focus/[projectId]:
 2. Create/reuse focus_session record  ← AUTO on page load
 3. Fetch project, lifecycle, last session, tasks, client, deployment
 4. Display full context
-```
 
-```
 Exit Focus mode:
 1. Modal: "Leave session notes (optional)?"
 2. Click Save: call endFocusSession(sessionId, notes)
 3. Navigate back to /cockpit
 ```
 
-**Files:** `src/app/(authenticated)/focus/[projectId]/focus-controller.tsx`
+**File:** `src/app/(authenticated)/focus/[projectId]/focus-controller.tsx`
 
 **Remediation:**
-- **Auto-start**: On component mount (useEffect), call `createFocusSession(projectId)` automatically. Remove the manual "Start Session" button. The focus session IS the fact of being on this page.
-- **Auto-end**: Use a `beforeunload` event listener AND intercept Next.js route changes. When the user navigates away, show a modal asking for optional session notes, then call `endFocusSession()`. If they close the browser without the modal, the session stays open (acceptable — can be cleaned up by a cron or on next visit: "You left a session open yesterday. Close it?").
-- **Reuse active session**: If an active session already exists for this project (no `ended_at`), reuse it instead of creating a new one. The `getActiveFocusSession()` action already exists for this.
+- **Auto-start**: On component mount (`useEffect`), check for an existing active session via `getActiveFocusSession(projectId)`. If none exists, call `createFocusSession(projectId)` automatically. Remove the "Ready to Focus?" prompt — entering the Focus page IS starting a session.
+- **Auto-end**: Intercept Next.js route changes (use `next/navigation`'s `useRouter` events or a custom navigation guard). When the user tries to leave, show a modal asking for optional session notes, then call `endFocusSession()`. Also add a `beforeunload` event for browser close/refresh.
+- **Reuse active session**: If an active session already exists (no `ended_at`), reuse it. Show "Session resumed — started X minutes ago."
+- **Stale session cleanup**: On Focus page load, if a stale session exists from a different day, auto-close it with no notes: "Closed stale session from yesterday."
 
 ---
 
-## P1 — High Priority Gaps
-
-### GAP-04: Task Committed Date Never Used in UI
-
-**Spec Reference:** PHASE1-UX-SPEC.md Section 1.2 Success Criteria ("Task commitment to dates works"), TASK-VIEW-SPEC.md Section 4.2 (Today's Queue = committed tasks)
-
-**Current State:** The `committed_date` column exists in the DB. Zero UI references it. The Flow Board's Zone 2 (Today's Queue) shows "In Progress" tasks instead of committed tasks.
-
-**Files:**
-- `src/app/(authenticated)/plan/plan-editor.tsx` (Task Commitment section — see GAP-01)
-- `src/components/features/focus/TodayQueueZone.tsx` (should filter by committed_date)
-- `src/components/features/focus/FlowBoard.tsx` (task grouping logic)
-
-**Remediation:**
-1. In Plan mode (GAP-01), let users commit tasks → sets `committed_date = tomorrow`
-2. In Flow Board Zone 2 (TodayQueueZone), filter tasks where `committed_date = today` instead of just `status = 'In Progress'`
-3. Committed tasks should be visually distinct (spec: "they carry a 'you promised yourself' weight")
-4. This is what connects the evening Plan ritual to the next day's Focus mode — it's the bridge
-
----
+## P1 — High Priority Gaps (Still Open)
 
 ### GAP-05: Sprint Carry-Forward Decision is Not Interactive
 
 **Spec Reference:** SPRINTS-SPEC.md Section 3 (③ Sprint Review), Section 4.4
 
-**Current State:** `SprintReview.tsx` shows incomplete tasks and says they "will remain in the backlog for the next sprint planning session." No interactive selection.
+**Current State:** `SprintReview.tsx` lines 82-100 show incomplete tasks in a read-only list with a tooltip: "These items will remain in the backlog for the next sprint planning session." There is a comment in the code acknowledging the spec gap. The `handleComplete()` function calls `completeSprint()` without any per-task decisions.
 
 **Spec says:**
 ```
-② Carry Forward Decision — For each incomplete task:
-  keep in next sprint, move to backlog, or drop.
+③ Sprint Review:
+2. Carry Forward Decision — For each incomplete task:
+   keep in next sprint, move to backlog, or drop.
 ```
 
 **File:** `src/components/features/sprints/SprintReview.tsx`
 
-**Remediation:** For each incomplete task, show three actions:
-- **[Next Sprint]** — keeps `sprint_id` (or assigns to new sprint when created)
-- **[Backlog]** — clears `sprint_id`, task returns to project backlog
-- **[Drop]** — either deletes or archives (confirm with user)
+**Remediation:** For each incomplete task, add a selector or button group with three options:
+- **[Next Sprint]** — task stays associated, will be pre-selected when next sprint is planned
+- **[Backlog]** — clears `sprint_id`, task returns to general project backlog
+- **[Drop]** — marks task as cancelled/dropped (confirm with user)
 
-The `completeSprint()` server action already accepts `carryForwardTaskIds` and `backlogTaskIds` parameters. The UI just needs to collect these selections before calling it.
+Default selection should be "Next Sprint" for most tasks. Collect the selections into two arrays (`carryForwardTaskIds` and `backlogTaskIds`), then pass them to `completeSprint()`.
 
-Also missing from Sprint Review: **"Start Sprint N+1?"** auto-prompt. After completing review, offer to immediately start the next sprint with AI-suggested goal based on remaining backlog.
+Also add: **"Start Sprint N+1?"** auto-prompt after completing the review, with the carried-forward tasks pre-checked.
 
 ---
 
 ### GAP-06: Task Skip Feature Missing (Only Block Exists)
 
-**Spec Reference:** TASK-VIEW-SPEC.md Section 4.1 (Zone 1 buttons), Section 6 (Skipping a Task)
+**Spec Reference:** TASK-VIEW-SPEC.md Section 4.1, Section 6
 
-**Current State:** Zone 1 has Done and Block buttons. No Skip (⏭ Next) button.
+**Current State:** `CurrentTaskZone.tsx` has three buttons: Block (with dialog), a MoreHorizontal menu (calls `unsetCurrentTask()` to put back in queue), and Complete. There is no explicit Skip button with the spec's behavior (increment skip_count, auto-advance to next task).
 
 **Spec says three buttons:**
 ```
 [✓ Done]  [⏭ Next]  [⛔ Block]
 ```
 
-**Skip behavior:**
+**Skip behavior (spec):**
 ```
-1. Click [⏭ Next] on current task
-2. Task card slides RIGHT back into Queue (stays in position)
+1. Click [⏭ Next]
+2. Task moves back into Queue (stays in position)
 3. "Skipped" badge appears briefly
-4. Next task in Queue slides UP into Zone 1
+4. Next task slides UP into Zone 1
 5. Skip count tracked — sprint review surfaces frequent skips
 ```
 
 **Files:**
 - `src/components/features/focus/CurrentTaskZone.tsx`
-- `src/lib/actions/flow-board.ts` (needs skip action)
+- `src/lib/actions/flow-board.ts`
 
 **Remediation:**
-1. Add a Skip button between Done and Block in `CurrentTaskZone.tsx`
-2. On skip: call `unsetCurrentTask()`, increment `skip_count` on the task, then auto-advance to next task via `getNextTask()`
-3. The `skip_count` column needs to be added if not present (check the tasks table — spec says `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS skip_count INTEGER DEFAULT 0`)
-4. Sprint Review should surface tasks with high skip counts as insights
+1. Replace the MoreHorizontal menu with an explicit Skip button (⏭ icon, "Skip" label)
+2. On skip: call `unsetCurrentTask()`, then increment `skip_count` on the task record, then call `getNextTask()` to auto-advance to the next task
+3. Verify `skip_count` column exists in the tasks table (TASK-VIEW-SPEC specifies `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS skip_count INTEGER DEFAULT 0`)
+4. In Sprint Review, surface tasks with high skip counts as an insight: "These tasks were frequently skipped — consider removing or breaking them down"
 
 ---
 
@@ -243,99 +167,80 @@ Also missing from Sprint Review: **"Start Sprint N+1?"** auto-prompt. After comp
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 7.2
 
-**Current State:** `FlowBoard.tsx` has a toggle between "flow" and "board" modes. Board mode shows "Coming Soon" placeholder text.
+**Current State:** `FlowBoard.tsx` renders a toggle between "flow" and "board" modes. Board mode shows: "Board View Coming Soon (Use Flow View for now)".
 
 **File:** `src/components/features/focus/FlowBoard.tsx`
 
-**Remediation:** Implement the Sprint Board view as described in spec Section 7.2:
-- Three columns: TODO | IN PROGRESS | DONE
-- Sprint tasks organized by status
-- Blocked tasks pulled out separately below
-- Collapsible Backlog section at bottom
-- This is the kanban-style view for sprint planning and review
+**Remediation:** Implement the Sprint Board view from spec Section 7.2:
 
-This is used for:
-- Sprint planning (dragging tasks from backlog to sprint)
-- Sprint review (seeing full Done column)
-- Weekly reflection (full picture)
+```
+┌──────────────────┬──────────────────┬───────────────────────────┐
+│  TODO (5)        │  IN PROGRESS (1) │  DONE (7)                 │
+│  □ Auth errors   │  🔥 Refresh      │  ✅ Redis setup           │
+│  □ CASL perms    │     rotation     │  ✅ JWT signing           │
+│  ...             │                  │  ...                       │
+├──────────────────┴──────────────────┴───────────────────────────┤
+│  ⛔ BLOCKED (1): Admin dashboard — "Needs CASL"                │
+├─────────────────────────────────────────────────────────────────┤
+│  📦 BACKLOG (12 tasks not in sprint)                 [Expand ▼] │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Three columns (TODO/IN PROGRESS/DONE) for sprint tasks. Blocked tasks called out below. Collapsible backlog at bottom. Used for sprint planning and review.
 
 ---
 
-## P2 — Medium Priority Gaps
+## P2 — Medium Priority Gaps (Still Open)
 
 ### GAP-08: Context Bar Moon Icon Not Time-Aware
 
 **Spec Reference:** PHASE1-UX-SPEC.md Section 9, Section 16
 
-**Current State:** `context-bar.tsx` shows the Moon (🌙) icon whenever the mode is `plan`. The spec intends this as a time-aware nudge.
+**Current State:** `context-bar.tsx` line 59: Moon icon appears whenever `mode === 'cockpit'` as part of the Plan link. No time-based logic — no `new Date().getHours()` check anywhere.
 
-**Spec says:**
-```
-At 6 PM → Evening Plan nudges them to review today
-```
-```
-// Date Utilities
-export function isAfter6PM(): boolean;
-```
+**Spec intends:** Moon icon serves as a "time to wind down" signal after 6 PM.
 
 **File:** `src/components/layout/context-bar.tsx`
 
 **Remediation:**
-- In **Cockpit mode**: Show the Plan link with moon icon only after 6 PM (or user's configured time). Before 6 PM, the Plan link is still accessible but without the moon icon emphasis.
-- In **Plan mode**: Moon icon always shows (you're already there).
-- Add `isAfter6PM()` utility to `src/lib/utils.ts` or a date utilities file.
-
-This is a subtle but intentional design choice — the moon creates a "time to wind down" signal, not a permanent decoration.
+- In Cockpit mode: Show Plan link always, but add moon icon + visual emphasis (glow, pulse) only after 6 PM
+- Before 6 PM: Plan link shows without moon icon — still accessible, just not emphasized
+- Add utility: `function isEveningTime(): boolean { return new Date().getHours() >= 18; }`
+- The moon icon in Plan mode header (line 49) can stay always-on since you're already in the ritual
 
 ---
 
-### GAP-09: Zone 2 (Today's Queue) Doesn't Match Spec Visual
+### GAP-09: Zone 2 (Today's Queue) is Vertical Instead of Horizontal
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 4.2
 
-**Current State:** `TodayQueueZone.tsx` shows a vertical list of "In Progress" tasks with play buttons.
+**Current State:** `TodayQueueZone.tsx` renders tasks as a vertical stack (`space-y-2`). Filtering is correct (committed_date === today OR status === In Progress, excluding current and done).
 
-**Spec describes:**
+**Spec describes a horizontal conveyor belt:**
 ```
-A horizontal track showing today's committed tasks as cards
-flowing left to right. Done stacks on the left, upcoming on the right.
-
 ┌─DONE──────┐ ┌─DONE──────┐ ┌─NEXT──────┐ ┌────────────┐
 │ ✅ Redis  │ │ ✅ JWT    │ │ □ Refresh │ │ □ Session  │
-│ setup     │ │ signing   │ │ rotation  │ │ invalidate │
 └───────────┘ └───────────┘ └───────────┘ └────────────┘
 ◄─── completed ─────────── upcoming ────►
 ```
 
-**Key spec behaviors missing:**
-1. Should be HORIZONTAL cards (conveyor belt), not vertical list
-2. Should show COMMITTED tasks (`committed_date = today`), not just "In Progress"
-3. Done cards should be visible (grayed but present), not hidden
-4. Current card should have 🔥 indicator
-5. At-risk amber tint after 3 PM for uncommitted tasks
-6. "Below the track": sprint tasks not committed today shown as compact text
-
 **File:** `src/components/features/focus/TodayQueueZone.tsx`
 
-**Remediation:** Redesign as horizontal scrollable track. Use `flex-row overflow-x-auto` instead of vertical stack. Filter by `committed_date = today`. Show completed tasks on the left (grayed), upcoming on right. Mark current task with fire icon.
+**Remediation:**
+1. Change layout from `space-y-2` to `flex flex-row gap-3 overflow-x-auto` for horizontal scrolling
+2. Each card becomes a compact fixed-width card (~160px) with title, points, and status
+3. Done cards show on the LEFT (grayed but visible) — growing pile creates Progress Principle satisfaction
+4. Current card (in Zone 1) shows 🔥 indicator in the queue position
+5. After 3 PM: uncommitted tasks get subtle amber tint (loss aversion nudge)
+6. Below the track: compact text list of sprint tasks not committed today
 
 ---
 
-### GAP-10: No Capture Triage Integration in Plan
-
-**Spec Reference:** PHASE1-UX-SPEC.md Section 6.1
-
-**Current State:** Capture triage exists only on the standalone `/inbox` page. The Evening Plan page has no reference to captures.
-
-**Remediation:** (Covered in GAP-01, Section 4). Extract `CaptureTriage` component from `inbox-client.tsx` and embed in Plan editor. The inbox page continues to exist for ad-hoc triage, but the evening ritual must include this step.
-
----
-
-### GAP-11: Sprint Scope Protection Not Enforced in UI
+### GAP-11: Sprint Scope Protection — Tracking Only, No UI Enforcement
 
 **Spec Reference:** SPRINTS-SPEC.md Section 8
 
-**Current State:** `flow-board.ts` tracks scope changes when moving tasks to sprint mid-sprint (lines 147-153), but new tasks created during an active sprint don't explicitly go to backlog.
+**Current State:** `flow-board.ts` increments `scope_changes` when moving tasks to sprint mid-sprint. But `createTask()` in `tasks.ts` has no logic to prevent auto-assigning to sprint. UI doesn't label "Add to Backlog" during active sprints.
 
 **Spec says:**
 ```
@@ -344,20 +249,21 @@ Quick Capture → convert to task → Goes to BACKLOG, NOT sprint
 Manually add task to sprint → Allowed, logged as scope change
 ```
 
-**Files:**
-- `src/lib/actions/tasks.ts` — `createTask()` should NOT auto-assign sprint_id
-- `src/components/features/focus/FlowBoard.tsx` — new task button should clarify "Add to Backlog"
-- `src/components/features/focus/SprintBacklogZone.tsx` — "Add to Sprint" should log scope change
+Note: The spec intentionally chose "log scope changes instead of blocking them" — so enforcement is about UI defaults, not hard blocks.
 
-**Remediation:** In `createTask()`, ensure `sprint_id` is null by default even when there's an active sprint. The UI should label the add button as "Add to Backlog" during an active sprint. If user explicitly moves to sprint, increment `scope_changes` on the sprint record (this part works already).
+**Remediation:**
+1. In Focus mode task creation, ensure `sprint_id` is null by default (verify `createTask()` doesn't auto-assign)
+2. Label the add task button as "Add to Backlog" during active sprints
+3. If user moves task to sprint, show a brief notice: "Task added to sprint (+1 scope change)"
+4. Scope changes counter already works — this is mostly a UI labeling issue
 
 ---
 
-### GAP-12: Done Ribbon Missing Sprint/Commitment Progress Bars
+### GAP-12: Done Ribbon Missing Dual Progress Bars
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 5
 
-**Current State:** `DoneRibbon.tsx` shows task count and points. Missing the dual progress bars.
+**Current State:** `DoneRibbon.tsx` shows task count, story points, and a single "Daily Goal" progress bar.
 
 **Spec says:**
 ```
@@ -368,21 +274,19 @@ sprint: 5/12 ████████░░░░  committed: 3/5 ████�
 **File:** `src/components/features/focus/DoneRibbon.tsx`
 
 **Remediation:** Add two progress bars:
-1. **Sprint progress**: completed sprint tasks / total sprint tasks
+1. **Sprint progress**: completed sprint tasks / total sprint tasks (pass sprint data as props)
 2. **Committed progress**: completed committed tasks today / total committed tasks today
-Also add focus time from active session (calculated from session start time).
+3. Add focus time display (calculated from active session start time)
 
 ---
 
-## P3 — Low Priority / "Build Later" Gaps
+## P3 — Low Priority / "Build Later" Gaps (Still Open)
 
 ### GAP-13: Timeline View Not Implemented
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 7.3
 
-**Current State:** No Timeline view. Toggle only has Flow and Board.
-
-This is listed as "build later" in the spec (item 9 in implementation priority), so it's acceptable to defer. Add it to the view toggle when ready.
+Listed as "build later" (spec item 9). Add burndown-style timeline to view toggle when ready.
 
 ---
 
@@ -390,18 +294,7 @@ This is listed as "build later" in the spec (item 9 in implementation priority),
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 9.1
 
-**Current State:** `flow-board-next.ts` has a `getNextTask()` function. Need to verify it matches the spec scoring.
-
-**Spec scoring:**
-```
-Committed today but not started: 40%
-Sprint priority × urgency: 25%
-Unblocks other tasks: 15%
-Last touched longest ago: 10%
-Estimated effort fits remaining time: 10%
-```
-
-**Remediation:** Verify `getNextTask()` implements these weights. If it's a simple priority sort, update to match the weighted scoring.
+`flow-board-next.ts` has `getNextTask()`. Verify it matches the spec's weighted scoring (committed today 40%, sprint priority 25%, unblocks others 15%, last touched 10%, effort fits remaining time 10%).
 
 ---
 
@@ -409,11 +302,7 @@ Estimated effort fits remaining time: 10%
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 9.2
 
-**Current State:** Not implemented.
-
-**Spec says:** At 3 PM (configurable), show inline banner in Zone 2 if committed tasks are untouched.
-
-This is listed as "build later" (item 10). Acceptable to defer but note it exists.
+Not implemented. Listed as "build later" (spec item 10). Show inline banner in Zone 2 at 3 PM if committed tasks are untouched.
 
 ---
 
@@ -421,23 +310,7 @@ This is listed as "build later" (item 10). Acceptable to defer but note it exist
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 9.3
 
-**Current State:** Not implemented.
-
-**Spec says:** When leaving Focus mode after 5 PM, show session summary with focus time, tasks completed, sprint progress change, and commitment fulfillment rate.
-
-This is listed as "build later" (item 11). Acceptable to defer.
-
----
-
-### GAP-17: Task Time Tracking Per Task
-
-**Spec Reference:** TASK-VIEW-SPEC.md Section 11.1
-
-**Current State:** `CurrentTaskZone.tsx` has a timer that counts up, but it's display-only (resets on navigation). The `time_spent_minutes` column and `logTime()` action exist but need verification that time is actually persisted.
-
-**File:** `src/components/features/focus/CurrentTaskZone.tsx`, `src/lib/actions/flow-board.ts`
-
-**Remediation:** When a task stops being current (done, skipped, blocked, or user picks different task), persist the elapsed time to `tasks.time_spent_minutes` using `logTime()`. The timer in Zone 1 should restore from the stored value when returning to a previously started task.
+Not implemented. Listed as "build later" (spec item 11). Show session summary when leaving Focus after 5 PM.
 
 ---
 
@@ -445,55 +318,38 @@ This is listed as "build later" (item 11). Acceptable to defer.
 
 **Spec Reference:** TASK-VIEW-SPEC.md Section 6
 
-**Current State:** Tasks complete but no animation sequence.
-
-**Spec says:**
-```
-1. Click [✓ Done]
-2. Brief celebration: task card shrinks and slides LEFT into Done pile
-3. Counter in Done Ribbon increments with a pulse
-4. Sprint progress bar advances
-5. 300ms pause
-6. Next task from Queue slides UP into Zone 1
-7. If queue empty: AI suggestion appears
-Total: ~800ms
-```
-
-This is polish — can be deferred but would significantly improve the "one more" feeling the spec describes.
+No animation sequence on task completion. Spec describes an ~800ms flow: card shrinks → slides left → counter pulses → next task slides up. Pure polish but important for the "one more" dopamine loop.
 
 ---
 
 ## Implementation Order (Recommended)
 
-Prioritize by dependency chain and spec importance:
+### Sprint 1 — Focus Session Lifecycle (GAP-03)
+This is the only P0 remaining and blocks the "entering Focus IS working" philosophy.
+1. Auto-start session on Focus page mount (useEffect + createFocusSession)
+2. Reuse existing active session if present
+3. Auto-end with notes modal on navigation away
+4. Stale session cleanup on next visit
 
-### Sprint 1 — Fix the Evening Plan (GAP-01 + GAP-02 + GAP-04)
-1. Implement AI recommendation scoring algorithm (GAP-02)
-2. Create `TodayReview` component
-3. Create `AIRecommendation` component
-4. Create `TaskCommitment` component (most important — uses `committed_date`)
-5. Extract and create `CaptureTriage` component
-6. Compose all 4 into `plan-editor.tsx`
-7. Verify `committed_date` flows to Flow Board Zone 2
+### Sprint 2 — Sprint Review + Skip (GAP-05 + GAP-06)
+Complete the sprint cycle and the Zone 1 interaction model.
+1. Interactive carry-forward UI per task in Sprint Review
+2. "Start next sprint?" auto-prompt after review
+3. Add Skip button to Zone 1 (⏭) with skip_count tracking
+4. Auto-advance to next task after skip
 
-### Sprint 2 — Fix Focus Session Lifecycle (GAP-03 + GAP-06)
-1. Auto-start focus session on page mount
-2. Auto-end with modal on navigation away
-3. Reuse active session logic
-4. Add Skip button to Zone 1
-5. Implement skip_count tracking
+### Sprint 3 — Visual & UX Polish (GAP-08 + GAP-09 + GAP-12 + GAP-07)
+Bring the UI closer to the spec's design language.
+1. Time-aware moon icon in context bar
+2. Horizontal Zone 2 redesign (conveyor belt)
+3. Done Ribbon dual progress bars (sprint + committed)
+4. Board view implementation (3-column kanban)
 
-### Sprint 3 — Sprint Completion & Scope (GAP-05 + GAP-11)
-1. Interactive carry-forward UI in Sprint Review
-2. "Start next sprint?" auto-prompt
-3. Enforce backlog-default for new tasks during active sprint
-4. Verify scope_changes counter works
-
-### Sprint 4 — Visual Polish (GAP-08 + GAP-09 + GAP-12 + GAP-07)
-1. Time-aware moon icon
-2. Horizontal Zone 2 redesign
-3. Done Ribbon progress bars
-4. Board view implementation
+### Sprint 4 — Scope Protection + Deferred Items (GAP-11 + P3s)
+1. UI labeling for "Add to Backlog" during active sprints
+2. AI next-task scoring verification (GAP-14)
+3. Timeline view (GAP-13) if time allows
+4. Commitment warning / end-of-day summary (GAP-15, GAP-16)
 
 ---
 
@@ -501,30 +357,35 @@ Prioritize by dependency chain and spec importance:
 
 These features match the specs and are properly implemented:
 
-- **Cockpit page**: Project cards with lifecycle timeline, financial snapshot, personal tasks queue
-- **Flow Board Zone 1**: Current task hero card with subtasks, timer, done/block buttons
+- **Evening Plan (5-section ritual)**: TodayReview → Reflection → CaptureTriage → AIRecommendation → TaskCommitment → Closing Thoughts
+- **AI Recommendation Engine**: Full weighted scoring with sprint awareness
+- **Task Commitment Flow**: committed_date set via Plan, flows to Focus Board Zone 2
+- **Cockpit page**: Project cards with lifecycle timeline, financial snapshot, personal tasks
+- **Flow Board Zone 1**: Current task hero card with subtasks, timer (persists every 60s), done/block buttons
 - **Flow Board Zone 3**: Sprint and Backlog columns with task cards
-- **Sprint Planning**: Goal, duration, task selection all work
-- **Sprint metrics display**: Velocity, points, completion percentage
-- **Quick Capture**: Cmd+K globally, modal opens, capture saved
-- **Inbox page**: Capture triage with convert-to-task flow
+- **Sprint Planning**: Goal, duration, task selection, commitment display
+- **Sprint metrics**: Velocity, points, completion percentage, scope changes counter
+- **Quick Capture**: Cmd+K globally, modal opens/closes, capture saved and triaged
+- **Inbox page**: Standalone capture triage with convert-to-task flow
 - **Subtask system**: JSONB storage, inline checkboxes, add/toggle actions
 - **Context Bar**: Mode-aware top bar (cockpit/focus/plan variants)
-- **App Shell**: No sidebar, context bar navigation works
-- **Server actions**: All CRUD operations for focus sessions, daily plans, captures, sprints, tasks
-- **Database schema**: All tables created, RLS policies in place, indexes present
+- **App Shell**: No sidebar, context bar navigation, Cmd+K listener
+- **Server actions**: Full CRUD for focus sessions, daily plans, captures, sprints, tasks, commits
+- **Database schema**: All tables, RLS policies, indexes, migrations in place
+- **Scope tracking**: scope_changes counter increments on mid-sprint task additions
 
 ---
 
 ## Summary
 
-| Severity | Count | Impact |
+| Severity | Count | Status |
 |----------|-------|--------|
-| P0 Critical | 3 | Evening Plan gutted, AI rec is stub, focus sessions don't auto-manage |
-| P1 High | 4 | committed_date unused, no carry-forward, no skip, board view placeholder |
-| P2 Medium | 5 | Moon icon, Zone 2 layout, captures in plan, scope protection, ribbon bars |
-| P3 Low | 6 | Timeline view, animations, time tracking persistence, warnings |
+| RESOLVED | 5 | Evening Plan, AI Rec, committed_date, Capture Triage in Plan, Time Tracking |
+| P0 Critical | 1 | Focus session auto-start/end |
+| P1 High | 3 | Sprint carry-forward, skip button, board view |
+| P2 Medium | 4 | Moon icon, Zone 2 horizontal, scope protection UI, ribbon dual bars |
+| P3 Low | 4 | Timeline, next-task scoring, 3 PM warning, end-of-day summary, animations |
 
-**Total: 18 gaps identified. 7 are critical/high and should be addressed before the app is usable as designed.**
+**Total: 12 remaining gaps. 1 critical, 3 high. The Evening Plan and AI systems are fully functional.**
 
-The system's core data layer is solid. The main gap is in the **Evening Plan** page, which is supposed to be the emotional anchor of the entire LifeOS ritual but currently has almost none of its specified functionality. Fixing GAP-01 (Plan) + GAP-02 (AI Rec) + GAP-04 (committed_date) would bring the most value because they connect the planning ritual to the execution workflow — which is the entire point of the Cockpit → Focus → Plan cycle.
+The most impactful single fix is **GAP-03 (Focus session auto-start/end)** because it's the only remaining P0 and it defines the philosophy of Focus mode: entering the page IS working. Everything else is high-value but the system is usable without it.

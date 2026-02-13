@@ -1298,7 +1298,7 @@ export type Database = {
       service_type: "Cloud" | "Web" | "Design" | "Marketing"
       task_category: "Business" | "Personal" | "Social" | "Research" | "Habit"
       task_priority: "Critical" | "High" | "Medium" | "Low"
-      task_status: "Todo" | "In Progress" | "Done" | "Blocked"
+      task_status: "Todo" | "In Progress" | "Done" | "Blocked" | "Cancelled"
       task_type: "Architectural" | "Implementation" | "Audit" | "Maintenance"
     }
     CompositeTypes: {
@@ -1468,7 +1468,7 @@ export const Constants = {
       service_type: ["Cloud", "Web", "Design", "Marketing"],
       task_category: ["Business", "Personal", "Social", "Research", "Habit"],
       task_priority: ["Critical", "High", "Medium", "Low"],
-      task_status: ["Todo", "In Progress", "Done", "Blocked"],
+      task_status: ["Todo", "In Progress", "Done", "Blocked", "Cancelled"],
       task_type: ["Architectural", "Implementation", "Audit", "Maintenance"],
     },
   },
