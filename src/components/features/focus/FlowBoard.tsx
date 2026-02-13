@@ -48,7 +48,13 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
     const today = new Date().toISOString().split('T')[0];
 
     const sprintTasks = activeSprint ? tasks.filter(t => t.sprint_id === activeSprint.id) : [];
-    const backlogTasks = tasks.filter(t => !t.sprint_id && t.status !== 'Done');
+    const backlogTasks = tasks.filter(t => 
+        t.status !== 'Done' && 
+        (!activeSprint || t.sprint_id !== activeSprint.id) &&
+        !t.is_current &&
+        t.committed_date !== today &&
+        t.status !== 'In Progress'
+    );
     const completedTasks = activeSprint ? tasks.filter(t => t.sprint_id === activeSprint.id && t.status === 'Done') : [];
 
     // Focus Zones logic
