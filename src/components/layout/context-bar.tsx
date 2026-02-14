@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Moon, Inbox, Plus, ArrowLeft, Home, Zap, CalendarCheck } from "lucide-react";
+import { Moon, Inbox, Plus, ArrowLeft, Home, Zap, CalendarCheck, ListTodo, CalendarDays, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -11,14 +11,29 @@ interface ContextBarProps {
   clientName?: string;
   inboxCount?: number;
   onCapture?: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
-export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCapture }: ContextBarProps) {
+export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCapture, onToggleSidebar, isSidebarOpen }: ContextBarProps) {
     const router = useRouter();
 
     return (
         <header className="fixed top-0 left-0 right-0 h-14 bg-background/80 backdrop-blur-md border-b border-border z-40 flex items-center justify-between px-4 md:px-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+                {/* Hamburger toggle */}
+                <button
+                    onClick={onToggleSidebar}
+                    className="p-2 -ml-2 rounded-lg hover:bg-accent transition-colors"
+                    aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                >
+                    {isSidebarOpen ? (
+                        <X className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                        <Menu className="w-5 h-5 text-muted-foreground" />
+                    )}
+                </button>
+
                 {mode === 'cockpit' ? (
                     <div className="flex items-center gap-2 font-bold text-lg tracking-tight">
                         <Zap className="w-5 h-5 text-primary fill-primary/20" />
@@ -34,7 +49,7 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                 {mode === 'focus' && (
                     <div className="h-4 w-[1px] bg-border mx-2" />
                 )}
-                
+
                 {mode === 'focus' && (
                     <div className="flex flex-col justify-center">
                         <h1 className="text-sm font-semibold leading-none">{projectName}</h1>
@@ -54,16 +69,26 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
             </div>
 
             <div className="flex items-center gap-2">
-                {/* Plan Link (only in Cockpit) */}
+                {/* Navigation Links (only in Cockpit) */}
                 {mode === 'cockpit' && (
-                    <Link href="/plan" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
-                        {new Date().getHours() >= 18 ? (
-                            <Moon className="w-4 h-4 text-indigo-400" />
-                        ) : (
-                            <CalendarCheck className="w-4 h-4" />
-                        )}
-                        <span className="hidden sm:inline">Plan</span>
-                    </Link>
+                    <>
+                        <Link href="/tasks" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
+                            <ListTodo className="w-4 h-4" />
+                            <span className="hidden sm:inline">Tasks</span>
+                        </Link>
+                        <Link href="/calendar" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
+                            <CalendarDays className="w-4 h-4" />
+                            <span className="hidden sm:inline">Calendar</span>
+                        </Link>
+                        <Link href="/plan" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
+                            {new Date().getHours() >= 18 ? (
+                                <Moon className="w-4 h-4 text-indigo-400" />
+                            ) : (
+                                <CalendarCheck className="w-4 h-4" />
+                            )}
+                            <span className="hidden sm:inline">Plan</span>
+                        </Link>
+                    </>
                 )}
 
                 {/* Inbox Link */}
@@ -78,8 +103,8 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                 </div>
 
                 {/* Quick Capture Button */}
-                <button 
-                    onClick={onCapture} // Or trigger modal via context/event
+                <button
+                    onClick={onCapture}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors ml-2"
                 >
                     <Plus className="w-4 h-4" />

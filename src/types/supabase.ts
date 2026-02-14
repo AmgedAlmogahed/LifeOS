@@ -867,6 +867,7 @@ export type Database = {
           service_type: Database["public"]["Enums"]["service_type"] | null
           specs_md: string | null
           status: Database["public"]["Enums"]["project_status"]
+          target_date: string | null
           updated_at: string
         }
         Insert: {
@@ -883,6 +884,7 @@ export type Database = {
           service_type?: Database["public"]["Enums"]["service_type"] | null
           specs_md?: string | null
           status?: Database["public"]["Enums"]["project_status"]
+          target_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -899,6 +901,7 @@ export type Database = {
           service_type?: Database["public"]["Enums"]["service_type"] | null
           specs_md?: string | null
           status?: Database["public"]["Enums"]["project_status"]
+          target_date?: string | null
           updated_at?: string
         }
         Relationships: [
