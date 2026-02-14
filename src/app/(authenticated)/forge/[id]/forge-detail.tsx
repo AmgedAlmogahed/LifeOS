@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { Project, Task, ProjectAsset, Lifecycle, Client, LifecycleStage } from "@/types/database";
 import {
   ArrowLeft, CheckCircle2, Clock, AlertTriangle, Circle, ExternalLink,
-  Github, Figma, Database, FileText, ListChecks, Lock, Unlock, XCircle,
+  Github, Figma, Database, FileText, ListChecks, Lock, Unlock, XCircle, Play,
 } from "lucide-react";
+import { TaskDetailSheet } from "@/components/features/tasks/TaskDetailSheet";
 
 const stageOrder: LifecycleStage[] = ["Requirements", "Building", "Testing", "Deploying", "Maintenance"];
-const stageIcon: Record<string, string> = { Requirements: "📋", Building: "🔨", Testing: "🧪", Deploying: "🚀", Maintenance: "🔧" };
+const stageIcon: Record<string, string> = { Requirements: "\u{1F4CB}", Building: "\u{1F528}", Testing: "\u{1F9EA}", Deploying: "\u{1F680}", Maintenance: "\u{1F527}" };
 const statusIcon = { "Todo": Circle, "In Progress": Clock, "Done": CheckCircle2, "Blocked": AlertTriangle, "Cancelled": XCircle };
 const statusColor = { "Todo": "text-muted-foreground", "In Progress": "text-primary", "Done": "text-emerald-400", "Blocked": "text-red-400", "Cancelled": "text-muted-foreground/50" };
 const priorityColor = { Critical: "text-red-400 bg-red-400/10", High: "text-amber-400 bg-amber-400/10", Medium: "text-blue-400 bg-blue-400/10", Low: "text-muted-foreground bg-accent" };
@@ -22,6 +24,14 @@ export function ForgeDetail({
 }: {
   project: Project; tasks: Task[]; assets: ProjectAsset[]; lifecycle: Lifecycle | null; client: { id: string; name: string; brand_primary: string } | null;
 }) {
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsTaskSheetOpen(true);
+  };
+
   const todoTasks = tasks.filter((t) => t.status === "Todo");
   const inProgressTasks = tasks.filter((t) => t.status === "In Progress");
   const doneTasks = tasks.filter((t) => t.status === "Done");
@@ -41,7 +51,7 @@ export function ForgeDetail({
         <div>
           <span className="text-sm font-bold text-foreground">{project.name}</span>
           <span className="block text-[10px] text-muted-foreground">
-            {client ? client.name : "Unlinked"} · {project.service_type ?? "—"}
+            {client ? client.name : "Unlinked"} · {project.service_type ?? "\u2014"}
           </span>
         </div>
         <div className="ml-auto flex items-center gap-3">
@@ -55,6 +65,14 @@ export function ForgeDetail({
             </span>
           )}
           <span className={`text-xs font-semibold phase-${project.status?.toLowerCase()}`}>{project.status}</span>
+
+          {/* Enter Focus button */}
+          <Link
+            href={`/focus/${project.id}`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Play className="w-3.5 h-3.5" /> Enter Focus
+          </Link>
         </div>
       </div>
 
@@ -158,7 +176,11 @@ export function ForgeDetail({
               {tasks.map((t) => {
                 const Icon = statusIcon[t.status] ?? Circle;
                 return (
-                  <div key={t.id} className="flex items-center gap-3 p-3 rounded-lg bg-accent/15 hover:bg-accent/25 transition-colors">
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-accent/15 hover:bg-accent/25 transition-colors cursor-pointer"
+                    onClick={() => handleTaskClick(t)}
+                  >
                     <Icon className={`w-4 h-4 shrink-0 ${statusColor[t.status] ?? ""}`} />
                     <span className="text-sm font-medium text-foreground flex-1 truncate">{t.title}</span>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${priorityColor[t.priority] ?? ""}`}>
@@ -172,6 +194,17 @@ export function ForgeDetail({
           )}
         </div>
       </div>
+
+      {/* Task Detail Sheet */}
+      <TaskDetailSheet
+        task={selectedTask}
+        open={isTaskSheetOpen}
+        onOpenChange={(open) => {
+          setIsTaskSheetOpen(open);
+          if (!open) setSelectedTask(null);
+        }}
+        projectName={project.name}
+      />
     </div>
   );
 }

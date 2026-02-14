@@ -2,17 +2,20 @@
 
 import { Task, Sprint } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { Play, AlertCircle } from "lucide-react";
+import { Play, AlertCircle, CalendarClock } from "lucide-react";
 import { toggleTaskCurrent, updateTaskStatus } from "@/lib/actions/flow-board";
 import { useTransition } from "react";
+import { formatDistanceToNow, isPast } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface BoardViewProps {
     tasks: Task[];
     activeSprint: Sprint | null;
     projectId: string;
+    onTaskClick?: (task: Task) => void;
 }
 
-export function BoardView({ tasks, activeSprint, projectId }: BoardViewProps) {
+export function BoardView({ tasks, activeSprint, projectId, onTaskClick }: BoardViewProps) {
     const [isPending, startTransition] = useTransition();
 
     // Filter tasks into columns
@@ -38,7 +41,11 @@ export function BoardView({ tasks, activeSprint, projectId }: BoardViewProps) {
             </div>
             <div className="space-y-2">
                 {columnTasks.map(task => (
-                    <div key={task.id} className="group p-3 bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all">
+                    <div
+                        key={task.id}
+                        className="group p-3 bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => onTaskClick?.(task)}
+                    >
                         <div className="flex items-start justify-between gap-2">
                             <span className="text-sm font-medium line-clamp-2 flex-1">{task.title}</span>
                             {title === 'TODO' && (
@@ -46,13 +53,26 @@ export function BoardView({ tasks, activeSprint, projectId }: BoardViewProps) {
                                     size="icon"
                                     variant="ghost"
                                     className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                    onClick={() => handleStart(task.id)}
+                                    onClick={(e) => { e.stopPropagation(); handleStart(task.id); }}
                                     disabled={isPending}
                                 >
                                     <Play className="w-3 h-3" />
                                 </Button>
                             )}
                         </div>
+                        {/* Due date display */}
+                        {task.due_date && (
+                            <span className={cn(
+                                "text-[10px] mt-1.5 flex items-center gap-0.5",
+                                isPast(new Date(task.due_date)) && task.status !== "Done" ? "text-red-500" : "text-muted-foreground"
+                            )}>
+                                <CalendarClock className="w-2.5 h-2.5" />
+                                {isPast(new Date(task.due_date)) && task.status !== "Done"
+                                    ? "Overdue"
+                                    : formatDistanceToNow(new Date(task.due_date), { addSuffix: true })
+                                }
+                            </span>
+                        )}
                         <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
                             {task.story_points && <span className="bg-muted px-1.5 py-0.5 rounded">{task.story_points} pts</span>}
                             {task.priority === 'High' && <span className="text-red-500 font-bold">HIGH</span>}
@@ -85,7 +105,11 @@ export function BoardView({ tasks, activeSprint, projectId }: BoardViewProps) {
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {blockedTasks.map(task => (
-                            <div key={task.id} className="p-2 bg-background/50 rounded border border-red-500/10 text-sm">
+                            <div
+                                key={task.id}
+                                className="p-2 bg-background/50 rounded border border-red-500/10 text-sm cursor-pointer hover:bg-background/80 transition-colors"
+                                onClick={() => onTaskClick?.(task)}
+                            >
                                 {task.title}
                             </div>
                         ))}
@@ -101,9 +125,24 @@ export function BoardView({ tasks, activeSprint, projectId }: BoardViewProps) {
                     </summary>
                     <div className="px-4 pb-4 pt-1 space-y-2">
                         {backlogTasks.map(task => (
-                            <div key={task.id} className="p-2 bg-muted/20 rounded text-sm flex items-center justify-between">
+                            <div
+                                key={task.id}
+                                className="p-2 bg-muted/20 rounded text-sm flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors"
+                                onClick={() => onTaskClick?.(task)}
+                            >
                                 <span>{task.title}</span>
-                                {task.story_points && <span className="text-[10px] text-muted-foreground">{task.story_points} pts</span>}
+                                <div className="flex items-center gap-2">
+                                    {task.due_date && (
+                                        <span className={cn(
+                                            "text-[10px] flex items-center gap-0.5",
+                                            isPast(new Date(task.due_date)) ? "text-red-500" : "text-muted-foreground"
+                                        )}>
+                                            <CalendarClock className="w-2.5 h-2.5" />
+                                            {isPast(new Date(task.due_date)) ? "Overdue" : formatDistanceToNow(new Date(task.due_date), { addSuffix: true })}
+                                        </span>
+                                    )}
+                                    {task.story_points && <span className="text-[10px] text-muted-foreground">{task.story_points} pts</span>}
+                                </div>
                             </div>
                         ))}
                     </div>

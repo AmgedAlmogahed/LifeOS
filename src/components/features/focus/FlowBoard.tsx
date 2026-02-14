@@ -16,11 +16,13 @@ import { Clock, Play, LayoutTemplate, KanbanSquare, LogOut } from "lucide-react"
 import { endFocusSession } from "@/lib/actions/focus-sessions";
 import { DoneRibbon } from "./DoneRibbon";
 import { SprintReview } from "../sprints/SprintReview";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { TaskDetailSheet } from "../tasks/TaskDetailSheet";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { moveTaskToSprint, updateTaskStatus, toggleTaskCurrent } from "@/lib/actions/flow-board";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface FlowBoardProps {
     project: { id: string; name: string };
@@ -31,11 +33,33 @@ interface FlowBoardProps {
 
 type ViewMode = "flow" | "board" | "timeline";
 
+// ─── DroppableZone wrapper (Phase 4) ──────────────────────────────────
+function DroppableZone({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+    const { setNodeRef, isOver } = useDroppable({ id });
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(className, "transition-all duration-200", isOver && "ring-2 ring-primary/50 bg-primary/5 rounded-lg")}
+        >
+            {children}
+        </div>
+    );
+}
+
 export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowBoardProps) {
     const [isPending, startTransition] = useTransition();
     const [viewMode, setViewMode] = useState<ViewMode>("flow");
     const [showSprintReview, setShowSprintReview] = useState(false);
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+
+    // Task Detail Sheet state (Phase 2)
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
+
+    const handleTaskClick = (task: Task) => {
+        setSelectedTask(task);
+        setIsTaskSheetOpen(true);
+    };
 
     // Navigation guard state
     const [showEndModal, setShowEndModal] = useState(false);
@@ -227,12 +251,13 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                     <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-y-auto scrollbar-thin">
 
                         {/* Zone 1: Current Task */}
-                        <div id="current-zone" className="shrink-0">
+                        <DroppableZone id="current-zone" className="shrink-0">
                             {currentTask ? (
                                 <CurrentTaskZone
                                     task={currentTask}
                                     session={activeSession}
                                     projectId={project.id}
+                                    onTaskClick={handleTaskClick}
                                 />
                             ) : (
                                 /* Empty State / Suggestion */
@@ -284,27 +309,29 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                                     }
                                 })()
                             )}
-                        </div>
+                        </DroppableZone>
 
                         {/* Zone 2: Queue */}
-                        <div id="queue-zone" className="shrink-0">
+                        <DroppableZone id="queue-zone" className="shrink-0">
                             <TodayQueueZone
                                 tasks={queueTasks}
                                 projectId={project.id}
                                 sprintTaskCount={sprintRemainderTasks.length}
+                                onTaskClick={handleTaskClick}
                             />
-                        </div>
+                        </DroppableZone>
 
                         {/* Zone 3: Boards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div id="sprint-backlog-zone" className="min-h-[200px]">
+                            <DroppableZone id="sprint-backlog-zone" className="min-h-[200px]">
                                 <SprintBacklogZone
                                     tasks={sprintRemainderTasks}
                                     completedTasks={completedTasks}
                                     projectId={project.id}
+                                    onTaskClick={handleTaskClick}
                                 />
-                            </div>
-                            <div id="project-backlog-zone" className="min-h-[200px] border-l border-border/50 pl-6 border-dashed">
+                            </DroppableZone>
+                            <DroppableZone id="project-backlog-zone" className="min-h-[200px] border-l border-border/50 pl-6 border-dashed">
                                 <div className="mb-4">
                                     <h3 className="text-sm font-medium text-muted-foreground">Project Backlog</h3>
                                     <p className="text-xs text-muted-foreground/60">Tasks not in sprint</p>
@@ -313,14 +340,15 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                                     tasks={backlogTasks}
                                     completedTasks={[]}
                                     projectId={project.id}
+                                    onTaskClick={handleTaskClick}
                                 />
-                            </div>
+                            </DroppableZone>
                         </div>
                     </div>
                 )}
 
                 {viewMode === 'board' && (
-                    <BoardView tasks={tasks} activeSprint={activeSprint} projectId={project.id} />
+                    <BoardView tasks={tasks} activeSprint={activeSprint} projectId={project.id} onTaskClick={handleTaskClick} />
                 )}
 
                 {/* Persistent Done Ribbon */}
@@ -348,6 +376,17 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                         </div>
                     ) : null}
                 </DragOverlay>
+
+                {/* Task Detail Sheet (Phase 2) */}
+                <TaskDetailSheet
+                    task={selectedTask}
+                    open={isTaskSheetOpen}
+                    onOpenChange={(open) => {
+                        setIsTaskSheetOpen(open);
+                        if (!open) setSelectedTask(null);
+                    }}
+                    projectName={project.name}
+                />
 
                 {/* End Session Modal (Navigation Guard) */}
                 <Dialog open={showEndModal} onOpenChange={(open) => !open && handleCancelEnd()}>

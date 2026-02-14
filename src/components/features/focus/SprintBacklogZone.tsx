@@ -2,9 +2,12 @@
 
 import { Task } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { Check, ClipboardList, Clock, ArrowRight, Play } from "lucide-react";
+import { Check, ClipboardList, Clock, ArrowRight, Play, CalendarClock } from "lucide-react";
 import { useTransition } from "react";
-import { toggleTaskCurrent, updateTaskStatus } from "@/lib/actions/flow-board"; // Need updateTaskStatus
+import { toggleTaskCurrent, updateTaskStatus } from "@/lib/actions/flow-board";
+import { DraggableTaskCard } from "./DraggableTaskCard";
+import { formatDistanceToNow, isPast } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface SprintBacklogZoneProps {
     tasks: Task[];
@@ -12,9 +15,10 @@ interface SprintBacklogZoneProps {
     projectId: string;
     title?: string;
     variant?: "sprint" | "backlog";
+    onTaskClick?: (task: Task) => void;
 }
 
-export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "Backlog", variant = "sprint" }: SprintBacklogZoneProps) {
+export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "Backlog", variant = "sprint", onTaskClick }: SprintBacklogZoneProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleStart = (taskId: string) => {
@@ -25,8 +29,7 @@ export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "B
 
   const handleQueue = (taskId: string) => {
       startTransition(async () => {
-          // Move to Queue means In Progress
-          await updateTaskStatus(taskId, "In Progress"); 
+          await updateTaskStatus(taskId, "In Progress");
       });
   };
 
@@ -38,23 +41,41 @@ export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "B
            </h4>
            {tasks.length === 0 && <div className="text-sm text-muted-foreground italic">No backlog tasks.</div>}
            {tasks.map(task => (
-               <div key={task.id} className="p-3 bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all group relative">
-                   <div className="flex justify-between items-start mb-2">
-                       <span className="text-sm font-medium line-clamp-2">{task.title}</span>
-                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Button size="icon" variant="ghost" className="h-6 w-6" title="Move to Queue" onClick={() => handleQueue(task.id)} disabled={isPending}>
-                               <ArrowRight className="w-3.5 h-3.5" />
-                           </Button>
-                           <Button size="icon" variant="ghost" className="h-6 w-6 text-primary hover:bg-primary/10" title="Start Now" onClick={() => handleStart(task.id)} disabled={isPending}>
-                               <Play className="w-3.5 h-3.5 ml-0.5" />
-                           </Button>
+               <DraggableTaskCard key={task.id} task={task}>
+                   <div
+                       className="p-3 bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all group relative cursor-pointer"
+                       onClick={() => onTaskClick?.(task)}
+                   >
+                       <div className="flex justify-between items-start mb-2">
+                           <span className="text-sm font-medium line-clamp-2">{task.title}</span>
+                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <Button size="icon" variant="ghost" className="h-6 w-6" title="Move to Queue" onClick={(e) => { e.stopPropagation(); handleQueue(task.id); }} disabled={isPending}>
+                                   <ArrowRight className="w-3.5 h-3.5" />
+                               </Button>
+                               <Button size="icon" variant="ghost" className="h-6 w-6 text-primary hover:bg-primary/10" title="Start Now" onClick={(e) => { e.stopPropagation(); handleStart(task.id); }} disabled={isPending}>
+                                   <Play className="w-3.5 h-3.5 ml-0.5" />
+                               </Button>
+                           </div>
+                       </div>
+                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                           {task.story_points && <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded"><ClipboardList className="w-3 h-3" /> {task.story_points}</span>}
+                           {task.priority !== 'Medium' && <span className={`uppercase font-bold tracking-wider ${task.priority === 'High' ? 'text-orange-500' : 'text-muted-foreground'}`}>{task.priority}</span>}
+                           {/* Due date chip */}
+                           {task.due_date && (
+                               <span className={cn(
+                                   "flex items-center gap-0.5",
+                                   isPast(new Date(task.due_date)) ? "text-red-500" : "text-muted-foreground"
+                               )}>
+                                   <CalendarClock className="w-3 h-3" />
+                                   {isPast(new Date(task.due_date))
+                                       ? "Overdue"
+                                       : formatDistanceToNow(new Date(task.due_date), { addSuffix: true })
+                                   }
+                               </span>
+                           )}
                        </div>
                    </div>
-                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                       {task.story_points && <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded"><ClipboardList className="w-3 h-3" /> {task.story_points}</span>}
-                       {task.priority !== 'Medium' && <span className={`uppercase font-bold tracking-wider ${task.priority === 'High' ? 'text-orange-500' : 'text-muted-foreground'}`}>{task.priority}</span>}
-                   </div>
-               </div>
+               </DraggableTaskCard>
            ))}
        </div>
 
@@ -65,7 +86,11 @@ export function SprintBacklogZone({ tasks, completedTasks, projectId, title = "B
            </h4>
            {completedTasks.length === 0 && <div className="text-sm text-muted-foreground italic">Get something done!</div>}
            {completedTasks.map(task => (
-               <div key={task.id} className="p-2 flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 rounded border border-transparent">
+               <div
+                   key={task.id}
+                   className="p-2 flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 rounded border border-transparent cursor-pointer hover:bg-muted/30 transition-colors"
+                   onClick={() => onTaskClick?.(task)}
+               >
                    <div className="w-4 h-4 rounded-full border border-border bg-green-500/10 flex items-center justify-center text-green-500">
                        <Check className="w-2.5 h-2.5" />
                    </div>

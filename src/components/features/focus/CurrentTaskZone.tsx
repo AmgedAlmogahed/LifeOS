@@ -3,13 +3,15 @@
 import { useState, useEffect, useTransition } from "react";
 import { Task, FocusSession } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Clock, SkipForward, Plus, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, Clock, SkipForward, Plus, AlertCircle, CalendarClock } from "lucide-react";
 import { updateTask } from "@/lib/actions/tasks";
 import { addSubtask, toggleSubtask, logTime, unsetCurrentTask, toggleTaskCurrent, skipTask } from "@/lib/actions/flow-board";
 import { getNextTask } from "@/lib/actions/flow-board-next";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { formatDistanceToNow, isPast } from "date-fns";
+import { cn } from "@/lib/utils";
 
 // Define Subtask locally to avoid import issues
 interface Subtask {
@@ -22,9 +24,10 @@ interface CurrentTaskZoneProps {
   task?: Task;
   session: FocusSession | null;
   projectId: string;
+  onTaskClick?: (task: Task) => void;
 }
 
-export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZoneProps) {
+export function CurrentTaskZone({ task, session, projectId, onTaskClick }: CurrentTaskZoneProps) {
   const [isPending, startTransition] = useTransition();
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -35,10 +38,8 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
     if (session && task) {
        interval = setInterval(() => {
            setElapsed(e => e + 1);
-           // Every minute, sync to server? Or wait till end?
-           // Syncing every minute is safe.
            if (elapsed > 0 && elapsed % 60 === 0) {
-               logTime(task.id, 1); 
+               logTime(task.id, 1);
            }
        }, 1000);
     }
@@ -62,30 +63,22 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
 
   const handleComplete = () => {
       startTransition(async () => {
-          // 1. Mark current done
           await updateTask(task.id, { status: "Done", completed_at: new Date().toISOString() });
-          
-          // 2. Try to find next task
           const { task: nextTask } = await getNextTask(projectId, task.id);
-          
           if (nextTask) {
               await toggleTaskCurrent(nextTask.id, projectId);
               toast.success("Task completed!", { description: `Auto-advanced to: ${nextTask.title}` });
           } else {
-              await unsetCurrentTask(projectId); 
+              await unsetCurrentTask(projectId);
               toast.success("Task completed! No next task found.");
           }
       });
   };
-  
+
   const handleBlock = () => {
         if (!blockReason.trim()) return;
         startTransition(async () => {
-            await updateTask(task.id, { 
-                status: "Blocked", 
-                // We might want to store reason in a note or specific field if schema supports it
-                // For now just status.
-            });
+            await updateTask(task.id, { status: "Blocked" });
             await unsetCurrentTask(projectId);
             setIsBlockedDialogOpen(false);
             setBlockReason("");
@@ -100,8 +93,8 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
   };
 
   const subtasks = (task.subtasks as unknown as Subtask[]) || [];
-  const progress = subtasks.length > 0 
-      ? Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100) 
+  const progress = subtasks.length > 0
+      ? Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100)
       : 0;
 
   return (
@@ -114,7 +107,22 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <div className="space-y-1 min-w-0 flex-1">
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">Current Focus</span>
-                <h2 className="text-xl sm:text-2xl font-bold leading-tight">{task.title}</h2>
+                <h2
+                    className="text-xl sm:text-2xl font-bold leading-tight cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => onTaskClick?.(task)}
+                >
+                    {task.title}
+                </h2>
+                {/* Due date display */}
+                {task.due_date && (
+                    <span className={cn(
+                        "text-xs mt-1 flex items-center gap-1",
+                        isPast(new Date(task.due_date)) && task.status !== "Done" ? "text-red-500" : "text-muted-foreground"
+                    )}>
+                        <CalendarClock className="w-3 h-3" />
+                        {isPast(new Date(task.due_date)) && task.status !== "Done" ? "Overdue" : "Due"} {formatDistanceToNow(new Date(task.due_date), { addSuffix: true })}
+                    </span>
+                )}
             </div>
 
             <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
@@ -124,8 +132,7 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
                          {Math.floor((task.time_spent_minutes || 0) + (elapsed / 60))}m
                      </div>
                  </div>
-                 
-                 {/* Block Button with Popover/Dialog */}
+
                  <Dialog open={isBlockedDialogOpen} onOpenChange={setIsBlockedDialogOpen}>
                     <DialogTrigger asChild>
                         <Button size="sm" variant="outline" className="h-9 px-3 text-red-500 hover:text-red-600 hover:bg-red-50" title="Block Task">
@@ -138,9 +145,9 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
                         </DialogHeader>
                         <div className="py-4">
                             <label className="text-sm font-medium mb-2 block">Reason for blocking:</label>
-                            <Textarea 
-                                placeholder="Waiting for API key..." 
-                                value={blockReason} 
+                            <Textarea
+                                placeholder="Waiting for API key..."
+                                value={blockReason}
                                 onChange={(e) => setBlockReason(e.target.value)}
                             />
                         </div>
@@ -184,13 +191,13 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
                 <span>Subtasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})</span>
                 <span>{progress}%</span>
             </div>
-            
+
             <div className="space-y-2">
                 {subtasks.map((sub, idx) => (
                     <div key={sub.id || idx} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group/item">
-                        <button 
+                        <button
                             onClick={() => toggleSubtask(task.id, sub.id, !sub.completed)}
-                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors 
+                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors
                                 ${sub.completed ? 'bg-primary border-primary text-primary-foreground' : 'border-input hover:border-primary'}`}
                         >
                             {sub.completed && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -204,9 +211,9 @@ export function CurrentTaskZone({ task, session, projectId }: CurrentTaskZonePro
 
             <form onSubmit={handleAddSubtask} className="relative">
                 <Plus className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                <input 
-                    type="text" 
-                    placeholder="Add a subtask..." 
+                <input
+                    type="text"
+                    placeholder="Add a subtask..."
                     className="w-full bg-muted/30 border border-transparent rounded-lg py-2.5 pl-10 pr-4 text-sm focus:bg-background focus:border-primary focus:ring-0 transition-all outline-none"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
