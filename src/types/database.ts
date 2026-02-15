@@ -18,6 +18,9 @@ export type TaskType = "Architectural" | "Implementation" | "Audit" | "Maintenan
 export type AuditLevel = "Critical" | "Warning" | "Info";
 export type AssetType = "github" | "figma" | "supabase" | "docs" | "other";
 
+export type WorkType = "Frontend" | "Backend" | "Integration" | "Testing" | "Deployment" | "Design" | "Audit" | "DevOps";
+export type PhaseStatus = "Planned" | "Active" | "Completed" | "Delayed";
+
 export type OpportunityStage = "Draft" | "Price Offer Sent" | "Negotiating" | "Won" | "Lost";
 export type ServiceType = "Cloud" | "Web" | "Design" | "Marketing";
 export type OfferStatus = "Draft" | "Sent" | "Accepted" | "Rejected" | "Expired";
@@ -60,6 +63,8 @@ export type Payment = T<"payments">;
 export type ContractAmendment = T<"contract_amendments">;
 export type MeetingMinutes = T<"meeting_minutes">;
 export type CommunicationLog = T<"communication_logs">;
+export type ProjectPhase = T<"project_phases">;
+export type ProjectModule = T<"project_modules">;
 
 // Phase 1 UX entities
 export type FocusSession = T<"focus_sessions">;
