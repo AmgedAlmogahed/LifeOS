@@ -8,12 +8,14 @@ export default async function ForgeDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const supabase = await createClient();
 
-  const [projectRes, tasksRes, assetsRes, lifecycleRes, clientsRes] = await Promise.all([
+  const [projectRes, tasksRes, assetsRes, lifecycleRes, clientsRes, phasesRes, modulesRes] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).maybeSingle(),
     supabase.from("tasks").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("project_assets").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("lifecycles").select("*").eq("project_id", id).limit(1),
     supabase.from("clients").select("id, name, brand_primary"),
+    supabase.from("project_phases").select("*").eq("project_id", id).order("order_index", { ascending: true }),
+    supabase.from("project_modules").select("*").eq("project_id", id).order("created_at", { ascending: true }),
   ]);
 
   if (!projectRes.data) redirect("/forge");
@@ -30,6 +32,8 @@ export default async function ForgeDetailPage({ params }: { params: Promise<{ id
       assets={(assetsRes.data ?? []) as any[]}
       lifecycle={((lifecycleRes.data ?? []) as any[])[0] ?? null}
       client={client}
+      phases={(phasesRes.data ?? []) as any[]}
+      modules={(modulesRes.data ?? []) as any[]}
     />
   );
 }

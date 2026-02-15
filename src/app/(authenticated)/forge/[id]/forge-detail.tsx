@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Project, Task, ProjectAsset, Lifecycle, Client, LifecycleStage } from "@/types/database";
+import type { Project, Task, ProjectAsset, Lifecycle, Client, LifecycleStage, ProjectPhase, ProjectModule, WorkType } from "@/types/database";
 import {
   ArrowLeft, CheckCircle2, Clock, AlertTriangle, Circle, ExternalLink,
-  Github, Figma, Database, FileText, ListChecks, Lock, Unlock, XCircle, Play,
+  Github, Figma, Database, FileText, ListChecks, Lock, Unlock, XCircle, Play, Layers, LayoutGrid,
 } from "lucide-react";
 import { TaskDetailSheet } from "@/components/features/tasks/TaskDetailSheet";
 
 const stageOrder: LifecycleStage[] = ["Requirements", "Building", "Testing", "Deploying", "Maintenance"];
-const stageIcon: Record<string, string> = { Requirements: "\u{1F4CB}", Building: "\u{1F528}", Testing: "\u{1F9EA}", Deploying: "\u{1F680}", Maintenance: "\u{1F527}" };
+const stageIcon: Record<string, string> = { Requirements: "📋", Building: "🔨", Testing: "🧪", Deploying: "🚀", Maintenance: "🔧" };
 const statusIcon = { "Todo": Circle, "In Progress": Clock, "Done": CheckCircle2, "Blocked": AlertTriangle, "Cancelled": XCircle };
 const statusColor = { "Todo": "text-muted-foreground", "In Progress": "text-primary", "Done": "text-emerald-400", "Blocked": "text-red-400", "Cancelled": "text-muted-foreground/50" };
 const priorityColor = { Critical: "text-red-400 bg-red-400/10", High: "text-amber-400 bg-amber-400/10", Medium: "text-blue-400 bg-blue-400/10", Low: "text-muted-foreground bg-accent" };
@@ -19,13 +19,17 @@ const assetIcons: Record<string, React.ReactNode> = {
   supabase: <Database className="w-4 h-4" />, docs: <FileText className="w-4 h-4" />, other: <ExternalLink className="w-4 h-4" />,
 };
 
+const workTypes: WorkType[] = ["Frontend", "Backend", "Integration", "Testing", "Deployment", "Design", "Audit", "DevOps"];
+
 export function ForgeDetail({
-  project, tasks, assets, lifecycle, client,
+  project, tasks, assets, lifecycle, client, phases, modules,
 }: {
   project: Project; tasks: Task[]; assets: ProjectAsset[]; lifecycle: Lifecycle | null; client: { id: string; name: string; brand_primary: string } | null;
+  phases: ProjectPhase[]; modules: ProjectModule[];
 }) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"tasks" | "matrix">("matrix");
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -161,38 +165,143 @@ export function ForgeDetail({
           </div>
         )}
 
-        {/* ─── Tasks ───────────────────────────────────────────── */}
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <ListChecks className="w-3.5 h-3.5" /> Tasks
-            </h2>
-            <span className="text-xs text-muted-foreground">{tasks.length} total</span>
-          </div>
-          {tasks.length === 0 ? (
-            <p className="text-xs text-muted-foreground/50 py-4 text-center">No tasks yet.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {tasks.map((t) => {
-                const Icon = statusIcon[t.status] ?? Circle;
+        {/* ─── Tabs ───────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 p-1 bg-accent/20 rounded-xl w-fit">
+          <button
+            onClick={() => setActiveTab("matrix")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === "matrix" ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" /> Module Matrix
+          </button>
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === "tasks" ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ListChecks className="w-3.5 h-3.5" /> Task View
+          </button>
+        </div>
+
+        {activeTab === "matrix" ? (
+          <div className="space-y-6">
+            {phases.length === 0 ? (
+              <div className="glass-card p-12 text-center">
+                <Layers className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No phases or modules defined yet.</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Start planning to see the matrix view.</p>
+              </div>
+            ) : (
+              phases.map((phase) => {
+                const phaseModules = modules.filter(m => m.phase_id === phase.id);
                 return (
-                  <div
-                    key={t.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-accent/15 hover:bg-accent/25 transition-colors cursor-pointer"
-                    onClick={() => handleTaskClick(t)}
-                  >
-                    <Icon className={`w-4 h-4 shrink-0 ${statusColor[t.status] ?? ""}`} />
-                    <span className="text-sm font-medium text-foreground flex-1 truncate">{t.title}</span>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${priorityColor[t.priority] ?? ""}`}>
-                      {t.priority}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{t.type}</span>
+                  <div key={phase.id} className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary uppercase">
+                        {phase.name}
+                      </div>
+                      <div className="h-px flex-1 bg-border/30" />
+                      <span className="text-[10px] text-muted-foreground">
+                        {phase.start_date} — {phase.end_date}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {phaseModules.map((module) => (
+                        <div key={module.id} className="glass-card p-4 flex flex-col">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-bold text-foreground">{module.name}</h3>
+                            <span className="text-[10px] font-mono text-muted-foreground">{module.progress}%</span>
+                          </div>
+                          
+                          <div className="space-y-2 flex-1">
+                            {workTypes.map(type => {
+                              const moduleTasks = tasks.filter(t => t.module_id === module.id && t.work_type === type);
+                              if (moduleTasks.length === 0) return null;
+                              
+                              const doneCount = moduleTasks.filter(t => t.status === "Done").length;
+                              const isComplete = doneCount === moduleTasks.length;
+
+                              return (
+                                <div key={type} className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="text-muted-foreground font-medium">{type}</span>
+                                    <span className={isComplete ? "text-emerald-400" : "text-primary"}>
+                                      {doneCount}/{moduleTasks.length}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {moduleTasks.map(t => (
+                                      <div 
+                                        key={t.id} 
+                                        className={`h-1.5 flex-1 rounded-full transition-colors ${
+                                          t.status === "Done" ? "bg-emerald-400" : 
+                                          t.status === "In Progress" ? "bg-primary" : 
+                                          t.status === "Blocked" ? "bg-red-400" : "bg-accent"
+                                        }`}
+                                        title={t.title}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between">
+                            <span className="text-[9px] text-muted-foreground">
+                              {module.start_date ? new Date(module.start_date).toLocaleDateString() : "No date"}
+                            </span>
+                            <button className="text-[9px] font-bold text-primary hover:underline">
+                              DETAILS
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
-              })}
+              })
+            )}
+          </div>
+        ) : (
+          /* ─── Tasks ───────────────────────────────────────────── */
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <ListChecks className="w-3.5 h-3.5" /> All Tasks
+              </h2>
+              <span className="text-xs text-muted-foreground">{tasks.length} total</span>
             </div>
-          )}
-        </div>
+            {tasks.length === 0 ? (
+              <p className="text-xs text-muted-foreground/50 py-4 text-center">No tasks yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {tasks.map((t) => {
+                  const Icon = statusIcon[t.status] ?? Circle;
+                  return (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-accent/15 hover:bg-accent/25 transition-colors cursor-pointer"
+                      onClick={() => handleTaskClick(t)}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${statusColor[t.status] ?? ""}`} />
+                      <span className="text-sm font-medium text-foreground flex-1 truncate">{t.title}</span>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${priorityColor[t.priority] ?? ""}`}>
+                        {t.priority}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {t.work_type || t.type}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task Detail Sheet */}
