@@ -26,14 +26,22 @@ interface SimpleSprint {
   planned_end_at: string | null;
 }
 
+interface SimpleModule {
+  id: string;
+  name: string;
+  project_id: string;
+}
+
 interface TasksClientProps {
   tasks: Task[];
   projects: SimpleProject[];
   activeSprints: SimpleSprint[];
+  modules: SimpleModule[];
 }
 
-type GroupBy = "project" | "priority" | "status" | "flat";
+type GroupBy = "project" | "module" | "dev_type" | "priority" | "status" | "flat";
 type StatusFilter = "all" | "Todo" | "In Progress" | "Blocked" | "Done";
+type DevTypeFilter = "all" | "frontend" | "backend" | "fullstack" | "design";
 
 const statusIcon: Record<string, typeof Circle> = {
   "Todo": Circle,
@@ -79,11 +87,12 @@ function dueDateLabel(dateStr: string | null, status: string): { text: string; c
   return { text: `in ${daysUntil}d`, className: "text-muted-foreground" };
 }
 
-export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps) {
+export function TasksClient({ tasks, projects, activeSprints, modules }: TasksClientProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [devTypeFilter, setDevTypeFilter] = useState<DevTypeFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("project");
   const [showDone, setShowDone] = useState(false);
 
@@ -92,6 +101,12 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
     projects.forEach(p => { map[p.id] = p; });
     return map;
   }, [projects]);
+
+  const moduleMap = useMemo(() => {
+    const map: Record<string, SimpleModule> = {};
+    modules.forEach(m => { map[m.id] = m; });
+    return map;
+  }, [modules]);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -115,8 +130,12 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
       result = result.filter(t => t.status === statusFilter);
     }
 
+    if (devTypeFilter !== "all") {
+      result = result.filter(t => t.dev_type === devTypeFilter);
+    }
+
     return result;
-  }, [tasks, projectFilter, statusFilter]);
+  }, [tasks, projectFilter, statusFilter, devTypeFilter]);
 
   // Separate done tasks
   const activeTasks = filteredTasks.filter(t => t.status !== "Done");
@@ -147,6 +166,40 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
         if (a.label.startsWith("Personal")) return 1;
         if (b.label.startsWith("Personal")) return -1;
         return a.label.localeCompare(b.label);
+      });
+      return groups;
+    }
+
+    if (groupBy === "module") {
+      const byModule: Record<string, Task[]> = {};
+      activeTasks.forEach(t => {
+        const key = t.module_id || "unassigned";
+        if (!byModule[key]) byModule[key] = [];
+        byModule[key].push(t);
+      });
+      Object.entries(byModule).forEach(([key, moduleTasks]) => {
+        const label = key === "unassigned" ? "Unassigned Module" : (moduleMap[key]?.name || "Unknown Module");
+        groups.push({ id: key, label: `${label} (${moduleTasks.length})`, tasks: moduleTasks });
+      });
+      groups.sort((a, b) => {
+        if (a.id === "unassigned") return 1;
+        if (b.id === "unassigned") return -1;
+        return a.label.localeCompare(b.label);
+      });
+      return groups;
+    }
+
+    if (groupBy === "dev_type") {
+      const byDevType: Record<string, Task[]> = {};
+      activeTasks.forEach(t => {
+        const key = t.dev_type || "unassigned";
+        if (!byDevType[key]) byDevType[key] = [];
+        byDevType[key].push(t);
+      });
+      ["frontend", "backend", "fullstack", "design", "unassigned"].forEach(dt => {
+         if (byDevType[dt]?.length) {
+            groups.push({ id: dt, label: `${dt.toUpperCase()} (${byDevType[dt].length})`, tasks: byDevType[dt] });
+         }
       });
       return groups;
     }
@@ -232,6 +285,21 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
           ))}
         </div>
 
+        {/* Dev Type filter */}
+        <div className="flex items-center gap-1.5 border-l border-border/50 pl-3">
+          <select
+            value={devTypeFilter}
+            onChange={(e) => setDevTypeFilter(e.target.value as DevTypeFilter)}
+            className="text-[11px] font-medium bg-transparent border-0 outline-none focus:ring-0 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <option value="all">All Types</option>
+            <option value="frontend">Frontend</option>
+            <option value="backend">Backend</option>
+            <option value="fullstack">Fullstack</option>
+            <option value="design">Design</option>
+          </select>
+        </div>
+
         {/* Group by */}
         <div className="ml-auto flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Group</span>
@@ -241,6 +309,8 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
             className="text-xs bg-muted/30 border border-border rounded-lg px-2.5 py-1.5 outline-none focus:border-primary transition-colors cursor-pointer"
           >
             <option value="project">By Project</option>
+            <option value="module">By Module</option>
+            <option value="dev_type">By Dev Type</option>
             <option value="priority">By Priority</option>
             <option value="status">By Status</option>
             <option value="flat">Flat List</option>
@@ -292,6 +362,13 @@ export function TasksClient({ tasks, projects, activeSprints }: TasksClientProps
                       <span className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground/50 shrink-0 hidden sm:inline">
                         Personal
                       </span>
+                    )}
+
+                    {/* Dev Type tag */}
+                    {task.dev_type && (
+                        <span className="text-[9px] font-medium px-2 py-0.5 rounded border border-border shrink-0 text-muted-foreground capitalize">
+                          {task.dev_type}
+                        </span>
                     )}
 
                     {/* Priority */}

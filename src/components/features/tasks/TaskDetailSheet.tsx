@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Task, Subtask } from "@/types/database";
+import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
 } from "@/components/ui/sheet";
@@ -23,6 +24,7 @@ interface TaskDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectName?: string;
+  scopeNodes?: ScopeNode[];
 }
 
 const statusOptions = ["Todo", "In Progress", "Done", "Blocked"] as const;
@@ -42,7 +44,7 @@ const priorityColors: Record<string, string> = {
   "Low": "bg-muted text-muted-foreground",
 };
 
-export function TaskDetailSheet({ task, open, onOpenChange, projectName }: TaskDetailSheetProps) {
+export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNodes }: TaskDetailSheetProps) {
   const [isPending, startTransition] = useTransition();
   const [editTitle, setEditTitle] = useState("");
   const [titleEditing, setTitleEditing] = useState(false);
@@ -123,7 +125,11 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName }: TaskD
   const handleBlock = () => {
     if (!blockReason.trim()) return;
     startTransition(async () => {
-      await updateTask(task.id, { status: "Blocked" });
+      await updateTask(task.id, {
+        status: "Blocked",
+        // Persist the block reason to the database column
+        block_reason: blockReason.trim(),
+      } as any);
       router.refresh();
       toast.info("Task blocked");
       setShowBlockInput(false);
@@ -230,6 +236,32 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName }: TaskD
         </SheetHeader>
 
         <div className="space-y-5 px-4 pb-4">
+          {/* Scope node assignment */}
+          {scopeNodes && scopeNodes.length > 0 && (
+            <div className="flex items-center gap-2 pt-2">
+              <span className="text-xs text-muted-foreground shrink-0">Scope:</span>
+              <select
+                value={(task as any).scope_node_id ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value || null;
+                  startTransition(async () => {
+                    await updateTask(task.id, { scope_node_id: val } as any);
+                    router.refresh();
+                  });
+                }}
+                className="flex-1 bg-muted/30 border border-border rounded px-2 py-1 text-xs outline-none focus:border-primary"
+              >
+                <option value="">— No scope —</option>
+                {scopeNodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.node_type === "portal" || n.node_type === "Portal" ? "" : n.node_type === "module" || n.node_type === "Module" ? "  " : "    "}
+                    {n.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Meta row */}
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {projectName && (

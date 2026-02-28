@@ -6,7 +6,7 @@ import {
   Zap, ListTodo, CalendarDays, Moon, CalendarCheck, Inbox, Hammer,
   Users, TrendingUp, DollarSign, MessageSquare, Handshake,
   FolderKanban, Rocket, ScrollText, ShieldCheck, Wrench, Terminal,
-  Sparkles, Lock, X, ChevronRight,
+  Sparkles, Lock, X, ChevronRight, LayoutDashboard, Box
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ const navGroups = [
   {
     label: "Workflow",
     items: [
+      { href: "/portal", label: "Portal", icon: LayoutDashboard },
       { href: "/cockpit", label: "Cockpit", icon: Zap },
       { href: "/tasks", label: "All Tasks", icon: ListTodo },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -30,8 +31,8 @@ const navGroups = [
   {
     label: "Projects",
     items: [
-      { href: "/forge", label: "Forge", icon: Hammer },
       { href: "/projects", label: "Projects", icon: FolderKanban },
+      { href: "/modules", label: "Modules", icon: Box },
       { href: "/deployments", label: "Deployments", icon: Rocket },
     ],
   },

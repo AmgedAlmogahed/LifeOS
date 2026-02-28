@@ -205,7 +205,7 @@ export function ClientDossier({
             </h2>
             <div className="grid grid-cols-3 gap-3">
               {projects.map((p) => (
-                <Link key={p.id} href={`/forge/${p.id}`}>
+                <Link key={p.id} href={`/projects/${p.id}`}>
                   <div className="p-3 rounded-lg bg-accent/20 hover:bg-accent/35 transition-colors cursor-pointer">
                     <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
                     <div className="flex items-center gap-2 mt-1.5">

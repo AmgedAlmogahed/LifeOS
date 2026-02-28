@@ -34,8 +34,8 @@ export function SprintControl({ project, activeSprint, tasks }: SprintControlPro
                 </div>
                 <div className="h-8 w-px bg-primary/20" />
                 <div className="flex flex-col text-xs text-muted-foreground">
-                    <span>Started {new Date(activeSprint.started_at).toLocaleDateString()}</span>
-                    <span>Ends {new Date(activeSprint.planned_end_at).toLocaleDateString()}</span>
+                    <span>Started {new Date(activeSprint.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                    <span>Ends {new Date(activeSprint.planned_end_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 </div>
                 <Button size="sm" variant="outline" className="ml-auto" onClick={handleCompleteSprint} disabled={isPending}>
                     {isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <CheckSquare className="w-3 h-3 mr-2" />}

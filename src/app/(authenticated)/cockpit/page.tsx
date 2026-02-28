@@ -54,7 +54,7 @@ export default async function CockpitPage() {
                             <h3 className="text-2xl font-bold mb-1">{recommendation.recommendedProject.name}</h3>
                             <p className="text-muted-foreground mb-4 max-w-lg">{recommendation.reason}</p>
 
-                            <Link href={`/forge/${recommendation.recommendedProject.id}`}
+                            <Link href={`/projects/${recommendation.recommendedProject.id}`}
                                 className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
                             >
                                 View Project <ArrowRight className="w-4 h-4" />
@@ -77,7 +77,7 @@ export default async function CockpitPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {activeProjects.map((project) => (
-                        <Link key={project.id} href={`/forge/${project.id}`} className="group block h-full">
+                        <Link key={project.id} href={`/projects/${project.id}`} className="group block h-full">
                             <div className="h-full bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors flex flex-col">
                                 <div className="flex items-start justify-between mb-3">
                                     <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{project.name}</h3>

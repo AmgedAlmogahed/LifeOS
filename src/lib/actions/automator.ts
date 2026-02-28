@@ -101,7 +101,7 @@ export async function runAutomator(trigger: TriggerType, entity: Record<string, 
                 is_resolved: false,
             });
 
-            revalidatePath("/forge");
+            revalidatePath("/projects");
             revalidatePath("/pipeline");
             return { project_id: project?.id };
         }

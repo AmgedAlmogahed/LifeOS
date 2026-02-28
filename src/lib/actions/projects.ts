@@ -8,6 +8,7 @@ export async function createProject(formData: FormData) {
     const name = formData.get("name") as string;
     if (!name?.trim()) return { error: "Name is required" };
 
+    const budgetStr = formData.get("budget") as string;
     const { data, error } = await (supabase.from("projects") as any).insert({
         name: name.trim(),
         description: (formData.get("description") as string) ?? "",
@@ -16,6 +17,8 @@ export async function createProject(formData: FormData) {
         is_frozen: false,
         specs_md: (formData.get("specs_md") as string) ?? "",
         client_id: formData.get("client_id") as string || null,
+        account_id: formData.get("account_id") as string || null,
+        budget: budgetStr ? Number(budgetStr) : 0,
         contract_id: formData.get("contract_id") as string || null,
         service_type: formData.get("service_type") as string || null,
     }).select().single();
@@ -32,7 +35,7 @@ export async function createProject(formData: FormData) {
         });
     }
 
-    revalidatePath("/forge");
+    revalidatePath("/projects");
     revalidatePath("/dashboard");
     return { success: true, id: data?.id };
 }
@@ -49,8 +52,8 @@ export async function updateProject(id: string, formData: FormData) {
     }
     const { error } = await (supabase.from("projects") as any).update(fields).eq("id", id);
     if (error) return { error: error.message };
-    revalidatePath("/forge");
-    revalidatePath(`/forge/${id}`);
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${id}`);
     revalidatePath("/dashboard");
     return { success: true };
 }
@@ -59,7 +62,17 @@ export async function deleteProject(id: string) {
     const supabase = await createClient();
     const { error } = await (supabase.from("projects") as any).delete().eq("id", id);
     if (error) return { error: error.message };
-    revalidatePath("/forge");
+    revalidatePath("/projects");
     revalidatePath("/dashboard");
+    return { success: true };
+}
+
+/** Update only the lifecycle status of a project */
+export async function updateProjectStatus(id: string, status: string) {
+    const supabase = await createClient();
+    const { error } = await (supabase.from("projects") as any).update({ status }).eq("id", id);
+    if (error) return { error: error.message };
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${id}`);
     return { success: true };
 }

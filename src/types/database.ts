@@ -18,8 +18,10 @@ export type TaskType = "Architectural" | "Implementation" | "Audit" | "Maintenan
 export type AuditLevel = "Critical" | "Warning" | "Info";
 export type AssetType = "github" | "figma" | "supabase" | "docs" | "other";
 
-export type WorkType = "Frontend" | "Backend" | "Integration" | "Testing" | "Deployment" | "Design" | "Audit" | "DevOps";
-export type PhaseStatus = "Planned" | "Active" | "Completed" | "Delayed";
+// Module Architecture enums
+export type PhaseStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED";
+export type ModuleStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+export type WorkType = "Backend" | "Frontend" | "Design" | "Integration" | "DevOps" | "Testing" | "Audit";
 
 export type OpportunityStage = "Draft" | "Price Offer Sent" | "Negotiating" | "Won" | "Lost";
 export type ServiceType = "Cloud" | "Web" | "Design" | "Marketing";
@@ -66,6 +68,17 @@ export type CommunicationLog = T<"communication_logs">;
 export type ProjectPhase = T<"project_phases">;
 export type ProjectModule = T<"project_modules">;
 
+// Domain Restructure entities
+export type Account = T<"accounts">;
+export type Platform = T<"platforms">;
+export type Asset = T<"assets">;
+export type Document = T<"documents">;
+export type Milestone = T<"milestones">;
+export type Module = T<"modules">;
+
+
+// Removed obsolete Module Architecture entities
+
 // Phase 1 UX entities
 export type FocusSession = T<"focus_sessions">;
 export type DailyPlan = T<"daily_plans">;
@@ -91,6 +104,12 @@ export type PaymentInsert = TI<"payments">;
 export type ContractAmendmentInsert = TI<"contract_amendments">;
 export type MeetingMinutesInsert = TI<"meeting_minutes">;
 export type CommunicationLogInsert = TI<"communication_logs">;
+export type AccountInsert = TI<"accounts">;
+export type PlatformInsert = TI<"platforms">;
+export type AssetInsert = TI<"assets">;
+export type DocumentInsert = TI<"documents">;
+export type MilestoneInsert = TI<"milestones">;
+export type ModuleInsert = TI<"modules">;
 
 // ─── Update Type Aliases ────────────────────────────────────────────────────
 export type ClientUpdate = TU<"clients">;
@@ -106,6 +125,12 @@ export type PaymentUpdate = TU<"payments">;
 export type ContractAmendmentUpdate = TU<"contract_amendments">;
 export type MeetingMinutesUpdate = TU<"meeting_minutes">;
 export type CommunicationLogUpdate = TU<"communication_logs">;
+export type AccountUpdate = TU<"accounts">;
+export type PlatformUpdate = TU<"platforms">;
+export type AssetUpdate = TU<"assets">;
+export type DocumentUpdate = TU<"documents">;
+export type MilestoneUpdate = TU<"milestones">;
+export type ModuleUpdate = TU<"modules">;
 
 // ─── Composite Types ────────────────────────────────────────────────────────
 

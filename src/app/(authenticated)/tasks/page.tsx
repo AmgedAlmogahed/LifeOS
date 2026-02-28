@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function TasksPage() {
   const supabase = await createClient();
 
-  const [tasksRes, projectsRes, sprintsRes] = await Promise.all([
+  const [tasksRes, projectsRes, sprintsRes, modulesRes] = await Promise.all([
     supabase
       .from("tasks")
       .select("*")
@@ -19,6 +19,9 @@ export default async function TasksPage() {
       .from("sprints")
       .select("id, project_id, sprint_number, goal, status, planned_end_at")
       .eq("status", "active"),
+    supabase
+      .from("modules")
+      .select("id, name, project_id"),
   ]);
 
   return (
@@ -26,6 +29,7 @@ export default async function TasksPage() {
       tasks={tasksRes.data ?? []}
       projects={projectsRes.data ?? []}
       activeSprints={sprintsRes.data ?? []}
+      modules={modulesRes.data ?? []}
     />
   );
 }

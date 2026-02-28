@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export function AppShell({ children, inboxCount = 0 }: { children: React.ReactNode, inboxCount?: number }) {
     const pathname = usePathname();
     const [isCaptureOpen, setIsCaptureOpen] = useState(false);
+    // Sidebar is hidden by default — toggled via hamburger in ContextBar
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Determine mode based on route
@@ -33,9 +34,14 @@ export function AppShell({ children, inboxCount = 0 }: { children: React.ReactNo
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Close sidebar when route changes
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [pathname]);
+
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">
-             {/* Context Bar (Top Navigation) */}
+             {/* Context Bar — mode-aware top nav */}
              <ContextBar
                 mode={mode}
                 inboxCount={inboxCount}
@@ -44,30 +50,27 @@ export function AppShell({ children, inboxCount = 0 }: { children: React.ReactNo
                 isSidebarOpen={isSidebarOpen}
              />
 
-             {/* Overlay for mobile when sidebar is open */}
-             {isSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-             )}
-
-             {/* Sidebar */}
+             {/* Sidebar — hidden by default, slides in on toggle */}
              <Sidebar
                 open={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
                 inboxCount={inboxCount}
              />
 
-             {/* Main Content Area — pushed right when sidebar is open */}
-             <main className={cn(
-                "flex-1 pt-14 relative overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out",
-                isSidebarOpen && "md:ml-60"
-             )}>
+             {/* Scrim overlay when sidebar is open */}
+             {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+             )}
+
+             {/* Main Content Area */}
+             <main className="flex-1 pt-14 relative overflow-y-auto overflow-x-hidden">
                 {children}
 
                 {/* Floating Action Button */}
-                <div className="fixed bottom-6 right-6 z-50 md:hidden">
+                <div className="fixed bottom-6 right-6 z-30 md:hidden">
                     <QuickCaptureButton onClick={() => setIsCaptureOpen(true)} />
                 </div>
              </main>

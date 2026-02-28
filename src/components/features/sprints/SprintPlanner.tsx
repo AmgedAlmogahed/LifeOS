@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Task, Project } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ interface SprintPlannerProps {
 }
 
 export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
+  const router = useRouter();
   const [goal, setGoal] = useState("");
   const [durationWeeks, setDurationWeeks] = useState(2);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -62,11 +64,11 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
           const sprintId = result.data.id;
 
           // 2. Assign Tasks
-          // Parallelize
           await Promise.all(
               Array.from(selectedTaskIds).map(taskId => moveTaskToSprint(taskId, sprintId, project.id))
           );
 
+          router.refresh();
           onClose();
       });
   };

@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { Moon, Inbox, Plus, ArrowLeft, Home, Zap, CalendarCheck, ListTodo, CalendarDays, Menu, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Moon, Inbox, Plus, ArrowLeft, Zap, CalendarCheck, ListTodo, CalendarDays, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -15,22 +15,24 @@ interface ContextBarProps {
   isSidebarOpen?: boolean;
 }
 
-export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCapture, onToggleSidebar, isSidebarOpen }: ContextBarProps) {
-    const router = useRouter();
+export function ContextBar({
+  mode, projectName, clientName, inboxCount = 0,
+  onCapture, onToggleSidebar, isSidebarOpen,
+}: ContextBarProps) {
 
     return (
-        <header className="fixed top-0 left-0 right-0 h-14 bg-background/80 backdrop-blur-md border-b border-border z-40 flex items-center justify-between px-4 md:px-6">
+        <header className="fixed top-0 left-0 right-0 h-14 bg-background/80 backdrop-blur-md border-b border-border z-50 flex items-center justify-between px-4 md:px-6">
             <div className="flex items-center gap-3">
-                {/* Hamburger toggle */}
+                {/* Hamburger toggle — always present */}
                 <button
                     onClick={onToggleSidebar}
-                    className="p-2 -ml-2 rounded-lg hover:bg-accent transition-colors"
+                    className="p-2 -ml-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
                     aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
                 >
                     {isSidebarOpen ? (
-                        <X className="w-5 h-5 text-muted-foreground" />
+                        <X className="w-5 h-5" />
                     ) : (
-                        <Menu className="w-5 h-5 text-muted-foreground" />
+                        <Menu className="w-5 h-5" />
                     )}
                 </button>
 
@@ -46,9 +48,7 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                     </Link>
                 )}
 
-                {mode === 'focus' && (
-                    <div className="h-4 w-[1px] bg-border mx-2" />
-                )}
+                {mode === 'focus' && <div className="h-4 w-[1px] bg-border mx-2" />}
 
                 {mode === 'focus' && (
                     <div className="flex flex-col justify-center">
@@ -91,7 +91,7 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                     </>
                 )}
 
-                {/* Inbox Link */}
+                {/* Inbox */}
                 <div className="relative">
                     <Link href="/inbox" className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium transition-colors">
                         <Inbox className="w-4 h-4" />
@@ -102,7 +102,7 @@ export function ContextBar({ mode, projectName, clientName, inboxCount = 0, onCa
                     )}
                 </div>
 
-                {/* Quick Capture Button */}
+                {/* Quick Capture */}
                 <button
                     onClick={onCapture}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors ml-2"

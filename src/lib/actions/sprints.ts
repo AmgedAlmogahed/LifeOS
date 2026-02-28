@@ -23,18 +23,21 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
     const { data: sprint, error } = await supabase
         .from("sprints")
         .insert({
-            ...data,
             project_id: projectId,
             user_id: user.id,
             sprint_number: sprintNumber,
-            status: "planning", // Default status
-            planned_end_at: data.planned_end_at!, // Fix property name mismatch
-            started_at: (data.started_at || null) as unknown as string, // Cast to satisfy potential strict type mismatch
+            status: data.status || "planning", // respect caller's status
+            planned_end_at: data.planned_end_at!,
+            started_at: (data.started_at || null) as unknown as string,
+            ...data,
         })
         .select()
         .single();
 
-    if (error) return { error: error.message };
+    if (error) {
+        console.error("[createSprint]", error.message);
+        return { error: error.message };
+    }
 
     revalidatePath(`/projects/${projectId}`);
     revalidatePath(`/focus/${projectId}`);

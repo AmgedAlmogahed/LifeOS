@@ -10,6 +10,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   clients: Client[];
+  accounts: any[];
 }
 
 const serviceTypes = [
@@ -19,7 +20,7 @@ const serviceTypes = [
   { value: "Marketing", label: "📣 Marketing" },
 ];
 
-export function ProjectForm({ open, onClose, clients }: Props) {
+export function ProjectForm({ open, onClose, clients, accounts }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -52,6 +53,15 @@ export function ProjectForm({ open, onClose, clients }: Props) {
           </Field>
           <Field label="Service Type" name="service_type">
             <SelectInput name="service_type" options={serviceTypes} />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Account (Domain Entity)" name="account_id">
+            <SelectInput name="account_id" options={accounts.map((a) => ({ value: a.id, label: a.name }))} />
+          </Field>
+          <Field label="Budget" name="budget">
+            <TextInput name="budget" type="number" placeholder="50000" />
           </Field>
         </div>
 
