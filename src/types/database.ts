@@ -65,8 +65,7 @@ export type Payment = T<"payments">;
 export type ContractAmendment = T<"contract_amendments">;
 export type MeetingMinutes = T<"meeting_minutes">;
 export type CommunicationLog = T<"communication_logs">;
-export type ProjectPhase = T<"project_phases">;
-export type ProjectModule = T<"project_modules">;
+
 
 // Domain Restructure entities
 export type Account = T<"accounts">;
