@@ -249,8 +249,44 @@ export function ProjectCanvas({
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto">
             {execTab === "sprint" && (
-              <div className="p-4">
+              <div className="p-4 space-y-4">
                 <SprintControl project={project} activeSprint={activeSprint} tasks={filteredTasks} />
+                {activeSprint && (
+                  <div className="space-y-1.5 mt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Sprint Backlog</h3>
+                    {filteredTasks.filter(t => t.sprint_id === activeSprint.id).length === 0 ? (
+                      <div className="py-8 flex flex-col items-center text-center bg-card/30 rounded-lg border border-dashed">
+                        <Clock className="w-8 h-8 text-muted-foreground/20 mb-2" />
+                        <p className="text-sm text-muted-foreground">No tasks in this sprint.</p>
+                      </div>
+                    ) : (
+                      filteredTasks.filter(t => t.sprint_id === activeSprint.id).map((task) => (
+                        <button
+                          key={task.id}
+                          onClick={() => setSelectedTask(task)}
+                          className="w-full glass-card p-3 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
+                        >
+                          {TASK_STATUS_ICON[task.status] ?? TASK_STATUS_ICON.Todo}
+                          <span className="flex-1 text-sm text-foreground truncate">{task.title}</span>
+                          <span className={cn(
+                            "text-[10px] font-medium px-2 py-0.5 rounded-md border shrink-0",
+                            task.priority === "Critical" ? "text-red-400 bg-red-500/10 border-red-500/20" :
+                            task.priority === "High"     ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
+                            task.priority === "Medium"   ? "text-primary bg-primary/10 border-primary/20" :
+                            "text-muted-foreground bg-accent border-border"
+                          )}>
+                            {task.priority}
+                          </span>
+                          {task.story_points && (
+                            <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                                {task.story_points} pts
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

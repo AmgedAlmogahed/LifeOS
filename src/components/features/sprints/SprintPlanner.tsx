@@ -19,7 +19,11 @@ interface SprintPlannerProps {
 export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
   const router = useRouter();
   const [goal, setGoal] = useState("");
-  const [durationWeeks, setDurationWeeks] = useState(2);
+  const [endDate, setEndDate] = useState<string>(() => {
+      const date = new Date();
+      date.setDate(date.getDate() + 14); // Default 2 weeks
+      return date.toISOString().split('T')[0];
+  });
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
@@ -30,15 +34,13 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
       setSelectedTaskIds(next);
   };
 
-  const calculateEndDate = () => {
-      const date = new Date();
-      date.setDate(date.getDate() + (durationWeeks * 7));
-      return date.toISOString();
-  };
-
   const handleStartSprint = () => {
       if (!goal.trim()) {
           alert("Please set a sprint goal.");
+          return;
+      }
+      if (!endDate) {
+          alert("Please set an end date for the sprint.");
           return;
       }
       if (selectedTaskIds.size === 0) {
@@ -49,10 +51,8 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
           // 1. Create Sprint
           const result = await createSprint(project.id, {
               goal,
-              planned_end_at: calculateEndDate(),
-              status: "active", // Start immediately? Or planning?
-              // Spec says "Sprint is created in planning state... then Start".
-              // But here we are doing "Plan & Start" in one go for MVP simplicity.
+              planned_end_at: new Date(endDate).toISOString(),
+              status: "active",
               started_at: new Date().toISOString()
           });
 
@@ -91,17 +91,22 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
                 />
             </div>
             <div className="grid gap-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Duration (Weeks)</label>
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Target End Date</label>
                 <div className="flex items-center gap-2">
                     <Input 
-                        type="number" 
-                        min={1} 
-                        max={4} 
-                        value={durationWeeks}
-                        onChange={e => setDurationWeeks(Number(e.target.value))}
-                        className="w-24"
+                        type="date" 
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        className="w-40"
                     />
-                    <span className="text-sm text-muted-foreground">Ends {new Date(Date.now() + durationWeeks * 7 * 86400000).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-1 text-xs">
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => {
+                            const d = new Date(); d.setDate(d.getDate() + 7); setEndDate(d.toISOString().split('T')[0]);
+                        }}>+1w</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => {
+                            const d = new Date(); d.setDate(d.getDate() + 14); setEndDate(d.toISOString().split('T')[0]);
+                        }}>+2w</Button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -138,11 +143,11 @@ export function SprintPlanner({ project, tasks, onClose }: SprintPlannerProps) {
             </div>
         </div>
 
-        <div className="pt-4 flex justify-end gap-2">
+        <div className="pt-4 flex justify-end gap-2 shrink-0">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={handleStartSprint} disabled={isPending}>
                 {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Start Sprint
+                Plan & Start Sprint
             </Button>
         </div>
     </div>
