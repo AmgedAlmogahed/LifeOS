@@ -12,13 +12,16 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
 
     if (!user) return { error: "Unauthorized" };
 
-    // Calculate sprint number
-    const { count } = await supabase
+    // Calculate sprint number by finding the highest existing number
+    const { data: latestSprint } = await supabase
         .from("sprints")
-        .select("*", { count: "exact", head: true })
-        .eq("project_id", projectId);
+        .select("sprint_number")
+        .eq("project_id", projectId)
+        .order("sprint_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const sprintNumber = (count || 0) + 1;
+    const sprintNumber = latestSprint?.sprint_number ? latestSprint.sprint_number + 1 : 1;
 
     const { data: sprint, error } = await supabase
         .from("sprints")
