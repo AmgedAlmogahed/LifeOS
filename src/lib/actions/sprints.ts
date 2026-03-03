@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { SprintInsert, SprintUpdate } from "@/types/database";
 
@@ -12,8 +12,11 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
 
     if (!user) return { error: "Unauthorized" };
 
-    // Calculate sprint number by finding the highest existing number
-    const { data: latestSprint } = await supabase
+    // Calculate sprint number by finding the highest existing number across ALL users in the project
+    // We use the admin client to bypass the "Users can manage own sprints" RLS policy,
+    // otherwise if User B created Sprint 1, User A wouldn't see it and would also try to create Sprint 1.
+    const adminSupabase = createAdminClient();
+    const { data: latestSprint } = await adminSupabase
         .from("sprints")
         .select("sprint_number")
         .eq("project_id", projectId)
