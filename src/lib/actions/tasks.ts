@@ -55,3 +55,52 @@ export async function commitTasks(taskIds: string[], date: string) {
     revalidatePath("/plan");
     revalidatePath("/focus");
 }
+
+export async function shiftTaskAndDependents(taskId: string, newStart: string, newEnd: string, projectId: string) {
+    const supabase = await createClient();
+
+    // Fetch original task to calculate delta
+    const { data: originalTask } = (await supabase.from("tasks").select("start_date, due_date").eq("id", taskId).single()) as any;
+    if (!originalTask || !originalTask.start_date) {
+        // Just update it if we don't have a baseline to calculate delta
+        await (supabase.from("tasks") as any).update({ start_date: newStart, due_date: newEnd } as any).eq("id", taskId);
+        revalidatePath(`/projects/${projectId}`);
+        return { success: true };
+    }
+
+    const deltaMs = new Date(newStart).getTime() - new Date(originalTask.start_date).getTime();
+
+    // Helper to recursively shift
+    async function shiftDependents(parentId: string, currentDelta: number) {
+        const { data: deps } = (await supabase.from("task_dependencies" as any)
+            .select("task_id")
+            .eq("depends_on_task_id", parentId)) as any;
+
+        if (!deps || deps.length === 0) return;
+
+        for (const dep of deps) {
+            const { data: childTask } = (await supabase.from("tasks").select("id, start_date, due_date").eq("id", dep.task_id).single()) as any;
+            if (childTask && childTask.start_date) {
+                const childNewStart = new Date(new Date(childTask.start_date).getTime() + currentDelta).toISOString();
+                const childNewEnd = childTask.due_date
+                    ? new Date(new Date(childTask.due_date).getTime() + currentDelta).toISOString()
+                    : null;
+
+                await (supabase.from("tasks") as any).update({ start_date: childNewStart, due_date: childNewEnd } as any).eq("id", childTask.id);
+                // Traverse down recursively (critical path chaining)
+                await shiftDependents(childTask.id, currentDelta);
+            }
+        }
+    }
+
+    // 1. Update the parent task 
+    await (supabase.from("tasks") as any).update({ start_date: newStart, due_date: newEnd } as any).eq("id", taskId);
+
+    // 2. Auto-shift all descendants
+    if (deltaMs !== 0) {
+        await shiftDependents(taskId, deltaMs);
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    return { success: true };
+}

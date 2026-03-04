@@ -91,7 +91,7 @@ export function SprintReview({ sprint, tasks, open, onOpenChange }: SprintReview
                                             className="h-7 px-2 text-[11px]"
                                             onClick={() => setTaskDecisions(prev => ({ ...prev, [t.id]: 'carry' }))}
                                         >
-                                            Next Sprint
+                                            Next Sprint / Backlog
                                         </Button>
                                         <Button
                                             size="sm"

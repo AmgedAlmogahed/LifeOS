@@ -4,6 +4,7 @@ import { ProjectCanvas } from "./project-forge";
 import type { Project, Sprint, Milestone } from "@/types/database";
 import { ScopeNode } from "@/lib/actions/scope-nodes";
 import { AuthorityApplication } from "@/lib/actions/authority-applications";
+import { TaskDependency } from "@/lib/actions/task-dependencies";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +34,13 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     scopeNodesRes,
     authorityApplicationsRes,
     lastSessionRes,
+    dependenciesRes,
   ] = await Promise.all([
     supabase.from("tasks").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("project_assets").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("meeting_minutes").select("*").eq("project_id", id).order("date", { ascending: false }),
     supabase.from("invoices").select("*, clients(name)").eq("project_id", id).order("created_at", { ascending: false }),
-    supabase.from("sprints").select("*").eq("project_id", id).eq("status", "active").limit(1),
+    supabase.from("sprints").select("*").eq("project_id", id).order("sprint_number", { ascending: true }),
     supabase.from("milestones").select("*").eq("project_id", id).order("deadline", { ascending: true }),
     supabase.from("scope_nodes" as any).select("*").eq("project_id", id).order("created_at", { ascending: true }),
     supabase.from("authority_applications" as any).select("*").eq("project_id", id).order("created_at", { ascending: false }),
@@ -51,13 +53,15 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       .not("ended_at", "is", null)
       .order("ended_at", { ascending: false })
       .limit(1),
+    // Fetch all task dependencies for this project's tasks to compute Locked state
+    supabase
+      .from("task_dependencies" as any)
+      .select("id, task_id, depends_on_task_id, created_at")
+      .order("created_at", { ascending: true }),
   ]);
 
-  const resumeNote: string | null =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (lastSessionRes.data as any[])?.[0]?.session_notes ?? null;
-
-  console.log("[ProjectDetailPage] sprintRes:", sprintRes);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resumeNote: string | null = (lastSessionRes.data as any[])?.[0]?.session_notes ?? null;
 
   return (
     <ProjectCanvas
@@ -66,11 +70,12 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       assets={assetsRes.data ?? []}
       minutes={(minutesRes.data as any[]) ?? []}
       invoices={(invoicesRes.data as any[]) ?? []}
-      activeSprint={(sprintRes.data as any[])?.[0] as Sprint | null}
+      sprints={(sprintRes.data as Sprint[]) ?? []}
       milestones={(milestonesRes.data as Milestone[]) ?? []}
       scopeNodes={(scopeNodesRes.data as unknown as ScopeNode[]) ?? []}
       authorityApplications={(authorityApplicationsRes.data as unknown as AuthorityApplication[]) ?? []}
       resumeNote={resumeNote}
+      taskDependencies={(dependenciesRes.data as unknown as TaskDependency[]) ?? []}
     />
   );
 }

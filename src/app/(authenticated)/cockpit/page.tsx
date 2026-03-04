@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateRecommendation } from "@/lib/actions/recommendations";
 import { Project, Task } from "@/types/database";
-import { ArrowRight, Clock, Target, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Clock, Target, CheckCircle2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -17,8 +17,14 @@ export default async function CockpitPage() {
     ] = await Promise.all([
         generateRecommendation(),
         supabase.from("projects")
-            .select("*, focus_sessions(started_at, ended_at)")
-            .in("status", ['Document', 'Freeze', 'Implement', 'Verify'])
+            .select(`
+              *,
+              focus_sessions(
+                session_notes,
+                ended_at
+              )
+            `)
+            .in("status", ['Document', 'Freeze', 'Implement', 'Verify', 'Understand'] as any[])
             .order("updated_at", { ascending: false }),
         supabase.from("invoices")
             .select("amount")
@@ -88,11 +94,29 @@ export default async function CockpitPage() {
                                     </span>
                                 </div>
 
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">
+                                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">
                                     {project.description || "No description provided."}
                                 </p>
 
-                                <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                                {/* Resume Snippet: show most recent session note */}
+                                {(() => {
+                                  const sessions = (project as any).focus_sessions;
+                                  if (!sessions || sessions.length === 0) return null;
+                                  // Sort by ended_at desc to find most recent
+                                  const sorted = [...sessions].sort((a: any, b: any) =>
+                                    new Date(b.ended_at || 0).getTime() - new Date(a.ended_at || 0).getTime()
+                                  );
+                                  const note = sorted[0]?.session_notes;
+                                  if (!note) return null;
+                                  return (
+                                    <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 mb-3">
+                                      <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
+                                      <span className="text-[10px] font-medium line-clamp-2 leading-relaxed">{note}</span>
+                                    </div>
+                                  );
+                                })()}
+
+                                <div className="mt-auto pt-3 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
                                     <span>Progress: {project.progress}%</span>
                                     {project.updated_at && (
                                         <span>{formatDistanceToNow(new Date(project.updated_at))} ago</span>

@@ -34,7 +34,7 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
             sprint_number: sprintNumber,
             status: data.status || "planning", // respect caller's status
             planned_end_at: data.planned_end_at!,
-            started_at: (data.started_at || null) as unknown as string,
+            started_at: data.started_at || new Date().toISOString(),
             ...data,
         })
         .select()
@@ -48,6 +48,65 @@ export async function createSprint(projectId: string, data: Partial<SprintInsert
     revalidatePath(`/projects/${projectId}`);
     revalidatePath(`/focus/${projectId}`);
     return { success: true, data: sprint };
+}
+
+export async function createMultipleSprints(
+    projectId: string,
+    count: number,
+    durationWeeks: number,
+    startDate: string
+) {
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return { error: "Unauthorized" };
+
+    const adminSupabase = createAdminClient();
+    const { data: latestSprint } = await adminSupabase
+        .from("sprints")
+        .select("sprint_number")
+        .eq("project_id", projectId)
+        .order("sprint_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const startNumber = latestSprint?.sprint_number ? latestSprint.sprint_number + 1 : 1;
+
+    const sprintsToInsert = [];
+    let currentStartDate = new Date(startDate);
+
+    for (let i = 0; i < count; i++) {
+        const plannedEndAt = new Date(currentStartDate);
+        plannedEndAt.setDate(plannedEndAt.getDate() + (durationWeeks * 7));
+
+        sprintsToInsert.push({
+            project_id: projectId,
+            user_id: user.id,
+            sprint_number: startNumber + i,
+            status: "planning",
+            started_at: currentStartDate.toISOString(),
+            planned_end_at: plannedEndAt.toISOString(),
+            goal: `Phase ${startNumber + i}`, // Default goal placeholder
+        });
+
+        // Set next start date to the end of the previous one
+        currentStartDate = new Date(plannedEndAt);
+    }
+
+    const { data, error } = await supabase
+        .from("sprints")
+        .insert(sprintsToInsert)
+        .select();
+
+    if (error) {
+        console.error("[createMultipleSprints]", error.message);
+        return { error: error.message };
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    return { success: true, data };
 }
 
 export async function updateSprint(sprintId: string, data: SprintUpdate) {
@@ -124,10 +183,34 @@ export async function completeSprint(
                 .in("id", taskDecisions.drop);
         }
 
-        // Carry-forward: set sprint_id = null (ready for next sprint planning)
+        // Carry-forward: find the NEXT planned sprint or default to backlog
         if (taskDecisions.carryForward.length > 0) {
+            // Find current sprint number first to search forwards
+            const { data: currentSprint } = await supabase
+                .from("sprints")
+                .select("sprint_number")
+                .eq("id", sprintId)
+                .single();
+
+            const currentNum = currentSprint?.sprint_number || 0;
+
+            const { data: nextSprint } = await supabase
+                .from("sprints")
+                .select("id")
+                .eq("project_id", projectId)
+                .eq("status", "planning")
+                .gt("sprint_number", currentNum)
+                .order("sprint_number", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            const targetSprintId = nextSprint?.id || null;
+
             await supabase.from("tasks")
-                .update({ sprint_id: null, added_to_sprint_at: null })
+                .update({
+                    sprint_id: targetSprintId,
+                    added_to_sprint_at: targetSprintId ? new Date().toISOString() : null
+                })
                 .in("id", taskDecisions.carryForward);
         }
     }

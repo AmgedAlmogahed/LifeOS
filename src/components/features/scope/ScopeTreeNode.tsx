@@ -6,8 +6,9 @@ import { ScopeNode, createScopeNode, deleteScopeNode, updateScopeNode } from "@/
 import { cn } from "@/lib/utils";
 import {
   ChevronRight, ChevronDown, Plus, Trash2, Pencil,
-  Building2, Package, Wrench, LayoutList,
+  Building2, Package, Wrench, LayoutList, FilePlus2,
 } from "lucide-react";
+import { createTask } from "@/lib/actions/tasks";
 
 // DB stores these as 'Module', 'Task Group', etc. — match what's in the DB default
 const NODE_ICONS: Record<string, React.ReactNode> = {
@@ -48,7 +49,9 @@ export function ScopeTreeNode({
 }: ScopeTreeNodeProps) {
   const [expanded, setExpanded] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newTaskTitle, setNewTaskTitle] = useState("");
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(node.title);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +89,35 @@ export function ScopeTreeNode({
       setShowAdd(false);
       setExpanded(true);
       router.refresh();
+    });
+  };
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    startTransition(async () => {
+      try {
+        await createTask({
+          title: newTaskTitle.trim(),
+          status: "Todo",
+          type: "Implementation",
+          priority: "Medium",
+          category: "Business",
+          project_id: projectId,
+          scope_node_id: node.id,
+          due_date: null,
+          is_recurring: false,
+          recurrence_rule: null,
+          reminder_sent: false,
+          metadata: {},
+          agent_context: {}
+        } as any);
+        setNewTaskTitle("");
+        setShowAddTask(false);
+        router.refresh();
+      } catch (err) {
+        console.error("[addTask]", err);
+      }
     });
   };
 
@@ -155,13 +187,20 @@ export function ScopeTreeNode({
             </button>
             {depth < 3 && (
               <button
-                onClick={(e) => { e.stopPropagation(); setShowAdd(!showAdd); setExpanded(true); }}
+                onClick={(e) => { e.stopPropagation(); setShowAdd(!showAdd); setShowAddTask(false); setExpanded(true); }}
                 className="p-0.5 rounded hover:bg-primary/20 hover:text-primary transition-colors"
                 title="Add child node"
               >
                 <Plus className="w-3 h-3" />
               </button>
             )}
+            <button
+               onClick={(e) => { e.stopPropagation(); setShowAddTask(!showAddTask); setShowAdd(false); setExpanded(true); }}
+               className="p-0.5 rounded hover:bg-green-500/20 hover:text-green-500 transition-colors"
+               title="Create task in this scope"
+            >
+               <FilePlus2 className="w-3 h-3" />
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
               className="p-0.5 rounded hover:bg-red-500/20 hover:text-red-400 transition-colors"
@@ -195,6 +234,32 @@ export function ScopeTreeNode({
             className="text-[10px] px-1.5 py-0.5 bg-primary text-primary-foreground rounded disabled:opacity-50"
           >
             Add
+          </button>
+        </form>
+      )}
+
+      {/* Add task form */}
+      {showAddTask && (
+        <form
+          onSubmit={handleAddTask}
+          className="flex items-center gap-1 mx-1 mt-0.5 mb-1"
+          style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            autoFocus
+            value={newTaskTitle}
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            placeholder="New task..."
+            className="flex-1 bg-muted/30 border border-green-500/40 rounded px-2 py-0.5 text-[11px] outline-none focus:border-green-500"
+            onKeyDown={(e) => e.key === "Escape" && (setShowAddTask(false), setNewTaskTitle(""))}
+          />
+          <button
+            type="submit"
+            disabled={!newTaskTitle.trim() || isPending}
+            className="text-[10px] px-1.5 py-0.5 bg-green-600 text-white hover:bg-green-700 transition-colors rounded disabled:opacity-50"
+          >
+            Create Task
           </button>
         </form>
       )}

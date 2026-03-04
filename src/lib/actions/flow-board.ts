@@ -215,12 +215,24 @@ export async function skipTask(taskId: string) {
     return { success: true };
 }
 
-export async function updateTaskStatus(taskId: string, status: "Todo" | "In Progress" | "Done" | "Blocked") {
+export async function updateTaskStatus(
+    taskId: string,
+    status: "Todo" | "In Progress" | "Done" | "Blocked",
+    block_reason?: string
+) {
     const supabase = await createClient();
+
+    const updatePayload: any = { status };
+
+    if (status === "Blocked" && block_reason) {
+        updatePayload.block_reason = block_reason;
+    } else if (status !== "Blocked") {
+        updatePayload.block_reason = null; // Clear blocker if unblocked
+    }
 
     const { data: task, error } = await supabase
         .from("tasks")
-        .update({ status })
+        .update(updatePayload)
         .eq("id", taskId)
         .select("project_id")
         .single();
@@ -232,4 +244,20 @@ export async function updateTaskStatus(taskId: string, status: "Todo" | "In Prog
         revalidatePath(`/projects/${task.project_id}`);
     }
     return { success: true };
+}
+
+export async function fetchLastSessionNotes(taskId: string) {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from("focus_sessions")
+        .select("session_notes, ended_at")
+        .eq("task_id", taskId)
+        .order("ended_at", { ascending: false })
+        .limit(1)
+        .single();
+
+    if (error || !data) return null;
+
+    return data.session_notes;
 }

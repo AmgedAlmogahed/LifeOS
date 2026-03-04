@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Task, Subtask } from "@/types/database";
 import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import {
@@ -10,14 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle2, Circle, AlertCircle, SkipForward, Trash2, CalendarClock,
-  Clock, Plus, Bot,
+  Clock, Plus, Bot, FastForward, Lock, Search
 } from "lucide-react";
 import { updateTask, deleteTask } from "@/lib/actions/tasks";
-import { addSubtask, toggleSubtask, skipTask, updateTaskStatus } from "@/lib/actions/flow-board";
-import { formatDistanceToNow, isPast } from "date-fns";
+import { addSubtask, toggleSubtask, skipTask, updateTaskStatus, fetchLastSessionNotes } from "@/lib/actions/flow-board";
+import { getTaskDependencies, addTaskDependency, TaskDependency } from "@/lib/actions/task-dependencies";
+import { format, formatDistanceToNow, isPast, isValid } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface TaskDetailSheetProps {
   task: Task | null;
@@ -25,6 +28,7 @@ interface TaskDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   projectName?: string;
   scopeNodes?: ScopeNode[];
+  allTasks?: Task[];
 }
 
 const statusOptions = ["Todo", "In Progress", "Done", "Blocked"] as const;
@@ -44,7 +48,14 @@ const priorityColors: Record<string, string> = {
   "Low": "bg-muted text-muted-foreground",
 };
 
-export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNodes }: TaskDetailSheetProps) {
+export function TaskDetailSheet({
+  task,
+  open,
+  onOpenChange,
+  projectName,
+  scopeNodes,
+  allTasks,
+}: TaskDetailSheetProps) {
   const [isPending, startTransition] = useTransition();
   const [editTitle, setEditTitle] = useState("");
   const [titleEditing, setTitleEditing] = useState(false);
@@ -54,7 +65,22 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNo
   const [blockReason, setBlockReason] = useState("");
   const [showBlockInput, setShowBlockInput] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [lastSessionNotes, setLastSessionNotes] = useState<string | null>(null);
+  
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
+  const [depSelect, setDepSelect] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
+
   const router = useRouter();
+
+  useEffect(() => {
+    if (task?.id) {
+      fetchLastSessionNotes(task.id).then(notes => {
+        setLastSessionNotes(notes);
+      });
+      getTaskDependencies(task.id).then(setDependencies);
+    }
+  }, [task?.id]);
 
   if (!task) return null;
 
@@ -106,9 +132,16 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNo
     });
   };
 
-  const handleDueDateChange = (date: string) => {
+  const handleStartDateChange = (date: Date | undefined) => {
     startTransition(async () => {
-      await updateTask(task.id, { due_date: date || null });
+      await updateTask(task.id, { start_date: date ? date.toISOString() : null } as any);
+      router.refresh();
+    });
+  };
+
+  const handleDueDateChange = (date: Date | undefined) => {
+    startTransition(async () => {
+      await updateTask(task.id, { due_date: date ? date.toISOString() : null });
       router.refresh();
     });
   };
@@ -125,14 +158,20 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNo
   const handleBlock = () => {
     if (!blockReason.trim()) return;
     startTransition(async () => {
+      // Optimistic UI updates
+      setShowBlockInput(false);
+      
       await updateTask(task.id, {
         status: "Blocked",
-        // Persist the block reason to the database column
         block_reason: blockReason.trim(),
       } as any);
+      
+      // Update local task state reference for immediate visual feedback before server refresh
+      (task as any).block_reason = blockReason.trim();
+      task.status = "Blocked";
+      
       router.refresh();
       toast.info("Task blocked");
-      setShowBlockInput(false);
       setBlockReason("");
     });
   };
@@ -236,6 +275,21 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNo
         </SheetHeader>
 
         <div className="space-y-5 px-4 pb-4">
+          
+          {/* Visual Blocking Banner */}
+          {(() => {
+            const unfinishedDeps = dependencies.map(d => allTasks?.find(t => t.id === d.depends_on_task_id)).filter(t => t && t.status !== "Done") as Task[];
+            if (unfinishedDeps.length === 0) return null;
+            return (
+              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex items-start gap-2 mt-4">
+                <Lock className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-sm text-foreground/90">
+                  <span className="font-semibold text-amber-500">Locked:</span> Waiting on {unfinishedDeps.map(t => `"${t.title}"`).join(", ")} to complete.
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Scope node assignment */}
           {scopeNodes && scopeNodes.length > 0 && (
             <div className="flex items-center gap-2 pt-2">
@@ -275,204 +329,348 @@ export function TaskDetailSheet({ task, open, onOpenChange, projectName, scopeNo
             )}
           </div>
 
-          {/* Due Date */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Due Date</label>
-            <input
-              type="date"
-              value={task.due_date || ""}
-              onChange={(e) => handleDueDateChange(e.target.value)}
-              className="block w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
-            />
-            {task.due_date && (
-              <span className={cn(
-                "text-xs flex items-center gap-1",
-                isPast(new Date(task.due_date)) && task.status !== "Done" ? "text-red-500" : "text-muted-foreground"
-              )}>
-                <CalendarClock className="w-3 h-3" />
-                {isPast(new Date(task.due_date)) && task.status !== "Done"
-                  ? `Overdue ${formatDistanceToNow(new Date(task.due_date))}`
-                  : `Due ${formatDistanceToNow(new Date(task.due_date), { addSuffix: true })}`
-                }
-              </span>
-            )}
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
-            {descEditing ? (
-              <Textarea
-                autoFocus
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={handleDescriptionBlur}
-                placeholder="Add a description..."
-                className="min-h-[80px] resize-none"
-              />
-            ) : (
-              <div
-                className="min-h-[60px] p-3 bg-muted/20 rounded-lg text-sm cursor-pointer hover:bg-muted/30 transition-colors whitespace-pre-wrap"
-                onClick={() => {
-                  setDescription((metadata.description as string) || "");
-                  setDescEditing(true);
-                }}
-              >
-                {(metadata.description as string) || (
-                  <span className="text-muted-foreground/50 italic">Click to add description...</span>
-                )}
+          {/* Last Session / Resume Snippet */}
+          {lastSessionNotes && (
+            <div className="mt-4 p-3 rounded-lg border border-primary/20 bg-primary/5 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-widest">
+                <FastForward className="w-3.5 h-3.5" />
+                Resume Context
               </div>
-            )}
-          </div>
-
-          {/* Subtasks */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Subtasks
-              </label>
-              <span className="text-xs text-muted-foreground">
-                {completedSubtasks} of {subtasks.length} complete
-              </span>
-            </div>
-
-            {subtasks.length > 0 && (
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${subtaskProgress}%` }}
-                />
-              </div>
-            )}
-
-            <div className="space-y-1">
-              {subtasks.map((sub) => (
-                <div key={sub.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/30 transition-colors">
-                  <button
-                    onClick={() => handleToggleSubtask(sub.id, !sub.completed)}
-                    className={cn(
-                      "w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                      sub.completed
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "border-input hover:border-primary"
-                    )}
-                  >
-                    {sub.completed && <CheckCircle2 className="w-3 h-3" />}
-                  </button>
-                  <span className={cn(
-                    "text-sm flex-1",
-                    sub.completed && "line-through text-muted-foreground"
-                  )}>
-                    {sub.title}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <form onSubmit={handleAddSubtask} className="relative">
-              <Plus className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Add subtask..."
-                className="w-full bg-muted/20 border border-transparent rounded-lg py-2 pl-8 pr-3 text-sm focus:bg-background focus:border-primary outline-none transition-all"
-                value={newSubtaskTitle}
-                onChange={(e) => setNewSubtaskTitle(e.target.value)}
-              />
-            </form>
-          </div>
-
-          {/* Delegation */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Delegation</label>
-            {task.delegated_to ? (
-              <div className="flex items-center gap-2 p-3 bg-muted/20 rounded-lg">
-                <Bot className="w-4 h-4 text-primary" />
-                <div className="flex-1">
-                  <span className="text-sm font-medium">{task.delegated_to}</span>
-                  <span className={cn(
-                    "ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                    task.delegation_status === "completed" ? "bg-green-500/10 text-green-500" :
-                    task.delegation_status === "in_progress" ? "bg-blue-500/10 text-blue-500" :
-                    "bg-amber-500/10 text-amber-500"
-                  )}>
-                    {task.delegation_status}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-muted-foreground hover:text-primary"
-                onClick={handleDelegate}
-                disabled={isPending}
-              >
-                <Bot className="w-4 h-4 mr-2" />
-                Delegate to OpenClaw
-              </Button>
-            )}
-          </div>
-
-          {/* Time Tracking */}
-          {(task.time_spent_minutes ?? 0) > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              <span>
-                {Math.floor((task.time_spent_minutes || 0) / 60)}h {(task.time_spent_minutes || 0) % 60}m logged
-              </span>
+              <p className="text-sm text-foreground/80 italic leading-relaxed whitespace-pre-wrap line-clamp-3">
+                "{lastSessionNotes}"
+              </p>
             </div>
           )}
-        </div>
 
-        <SheetFooter className="border-t border-border">
-          <div className="flex items-center gap-2 w-full flex-wrap">
-            {task.status !== "Done" && (
-              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleComplete} disabled={isPending}>
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Complete
-              </Button>
-            )}
-
-            {!showBlockInput && task.status !== "Blocked" && (
-              <Button size="sm" variant="outline" className="text-amber-500 hover:text-amber-600" onClick={() => setShowBlockInput(true)} disabled={isPending}>
-                <AlertCircle className="w-3.5 h-3.5 mr-1" /> Block
-              </Button>
-            )}
-
-            {showBlockInput && (
-              <div className="flex items-center gap-1 flex-1">
-                <input
+          {/* ────────────────── EXECUTION SECTION ────────────────── */}
+          <div className="pt-2 border-t border-border mt-4">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-4">Execution</h4>
+            
+            {/* Description */}
+            <div className="space-y-1.5 mb-6">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+              {descEditing ? (
+                <Textarea
                   autoFocus
-                  placeholder="Block reason..."
-                  className="flex-1 bg-muted/30 border border-border rounded px-2 py-1 text-sm outline-none focus:border-amber-500"
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleBlock()}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={handleDescriptionBlur}
+                  placeholder="Add a description..."
+                  className="min-h-[80px] resize-none"
                 />
-                <Button size="sm" variant="outline" onClick={handleBlock} disabled={!blockReason.trim() || isPending}>
-                  Confirm
-                </Button>
-              </div>
-            )}
-
-            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={handleSkip} disabled={isPending}>
-              <SkipForward className="w-3.5 h-3.5 mr-1" /> Skip
-            </Button>
-
-            <div className="ml-auto">
-              {!showDeleteConfirm ? (
-                <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-500" onClick={() => setShowDeleteConfirm(true)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
               ) : (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-red-500">Delete?</span>
-                  <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>No</Button>
-                  <Button size="sm" variant="destructive" onClick={handleDelete} disabled={isPending}>Yes</Button>
+                <div
+                  className="min-h-[60px] p-3 bg-muted/20 rounded-lg text-sm cursor-pointer hover:bg-muted/30 transition-colors whitespace-pre-wrap"
+                  onClick={() => {
+                    setDescription((metadata.description as string) || "");
+                    setDescEditing(true);
+                  }}
+                >
+                  {(metadata.description as string) || <span className="text-muted-foreground italic">Click to add description...</span>}
                 </div>
               )}
             </div>
+
+            {/* Subtasks (Checklist) */}
+            <div className="space-y-3 mb-6">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                <span>Checklist</span>
+                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">{completedSubtasks}/{subtasks.length}</span>
+              </label>
+
+              {/* Progress bar */}
+              {subtasks.length > 0 && (
+                <div className="w-full bg-muted/50 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-primary h-full transition-all duration-300" style={{ width: `${subtaskProgress}%` }} />
+                </div>
+              )}
+
+              {/* List */}
+              <div className="space-y-1.5">
+                {subtasks.map((st) => (
+                  <div key={st.id} className="flex items-start gap-2 group hover:bg-muted/10 p-1.5 rounded-md transition-colors">
+                    <button
+                      onClick={() => handleToggleSubtask(st.id, !st.completed)}
+                      className={cn("mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors", st.completed && "text-primary")}
+                    >
+                      {st.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4 cursor-pointer" />}
+                    </button>
+                    <span className={cn("text-sm", st.completed && "line-through text-muted-foreground/60")}>
+                      {st.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add New Input */}
+              <form onSubmit={handleAddSubtask} className="flex items-center gap-2 mt-2">
+                <input
+                  type="text"
+                  placeholder="Add item..."
+                  className="flex-1 bg-muted/20 border border-transparent hover:border-border focus:border-primary focus:bg-background rounded-md px-3 py-1.5 text-sm outline-none transition-all"
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  disabled={isPending}
+                />
+                {newSubtaskTitle.trim() && (
+                  <Button type="submit" size="sm" variant="ghost" className="h-8 w-8 p-0" disabled={isPending}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                )}
+              </form>
+            </div>
+
+            {/* Dates (Start & Due) */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Start Date */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Start Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-muted/30 border-border text-sm h-9",
+                        !(task as any).start_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      {(task as any).start_date && isValid(new Date((task as any).start_date)) && new Date((task as any).start_date).getFullYear() > 1900 ? (
+                        format(new Date((task as any).start_date), "MMM d, yyyy")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={(task as any).start_date && isValid(new Date((task as any).start_date)) && new Date((task as any).start_date).getFullYear() > 1900 ? new Date((task as any).start_date) : undefined}
+                      onSelect={handleStartDateChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* End Date */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">End Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-muted/30 border-border text-sm h-9",
+                        !task.due_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      {task.due_date && isValid(new Date(task.due_date)) && new Date(task.due_date).getFullYear() > 1900 ? (
+                        format(new Date(task.due_date), "MMM d, yyyy")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={task.due_date && isValid(new Date(task.due_date)) && new Date(task.due_date).getFullYear() > 1900 ? new Date(task.due_date) : undefined}
+                      onSelect={handleDueDateChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {/* Overdue/Due Status Banner */}
+                {task.due_date && isValid(new Date(task.due_date)) && new Date(task.due_date).getFullYear() > 1900 && (
+                  <span className={cn(
+                    "text-[10px] flex items-center gap-1 mt-1 font-medium",
+                    isPast(new Date(task.due_date)) && task.status !== "Done" ? "text-red-500" : "text-muted-foreground"
+                  )}>
+                    {isPast(new Date(task.due_date)) && task.status !== "Done"
+                      ? `Overdue ${formatDistanceToNow(new Date(task.due_date))}`
+                      : `Due ${formatDistanceToNow(new Date(task.due_date), { addSuffix: true })}`
+                    }
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </SheetFooter>
+
+          {/* ────────────────── CONTEXT SECTION ────────────────── */}
+          <div className="pt-2 border-t border-border mt-2">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-4">Context</h4>
+            
+            {/* Block Reason Display */}
+            {(task as any).block_reason && (
+              <div className="space-y-1.5 p-3 mb-6 rounded-lg bg-red-500/10 border border-red-500/20">
+                <label className="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Blocked Reason
+                </label>
+                <p className="text-sm text-foreground/90 mt-1 whitespace-pre-wrap">{(task as any).block_reason}</p>
+              </div>
+            )}
+
+            {/* Dependency Pre-requisite Linker */}
+            <div className="space-y-1.5 mb-6">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dependency Linker</label>
+              {dependencies.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {dependencies.map(dep => {
+                    const depTask = allTasks?.find(t => t.id === dep.depends_on_task_id);
+                    return depTask ? (
+                      <div key={dep.id} className="text-[10px] font-semibold bg-muted px-2 py-1 rounded border border-border flex items-center gap-1.5">
+                        <Lock className="w-3 h-3 text-muted-foreground" />
+                        {depTask.title}
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <select
+                  value={depSelect}
+                  onChange={(e) => setDepSelect(e.target.value)}
+                  className="flex-1 bg-muted/30 border border-border rounded-lg px-2 py-2 text-sm outline-none focus:border-primary transition-colors h-9"
+                  disabled={isLinking}
+                >
+                  <option value="">Attach Pre-requisite...</option>
+                  {allTasks?.filter(t => t.id !== task.id && !dependencies.some(d => d.depends_on_task_id === t.id)).map(t => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  disabled={!depSelect || isLinking}
+                  onClick={() => {
+                    if (!depSelect) return;
+                    setIsLinking(true);
+                    startTransition(async () => {
+                      const res = await addTaskDependency(task.id, depSelect, task.project_id!);
+                      if (res.success) {
+                        toast.success("Dependency Linked");
+                        getTaskDependencies(task.id).then(setDependencies);
+                        setDepSelect("");
+                      } else {
+                        toast.error(res.error || "Failed");
+                      }
+                      setIsLinking(false);
+                      router.refresh();
+                    });
+                  }}
+                  className="h-9 w-9 p-0 bg-muted/30 border-border"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Contract Reference */}
+            <div className="space-y-1.5 mb-6">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contract Reference</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Contract ID..."
+                  className="flex-1 bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
+                  value={(metadata.contract_id as string) || ""}
+                  onChange={(e) => {
+                    startTransition(async () => {
+                      await updateTask(task.id, {
+                        metadata: { ...metadata, contract_id: e.target.value } as any
+                      });
+                      router.refresh();
+                    });
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Doc Page Ref..."
+                  className="w-32 bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
+                  value={(metadata.doc_page_ref as string) || ""}
+                  onChange={(e) => {
+                    startTransition(async () => {
+                      await updateTask(task.id, {
+                        metadata: { ...metadata, doc_page_ref: e.target.value } as any
+                      });
+                      router.refresh();
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ────────────────── FOOTER SECTION ────────────────── */}
+          <div className="pt-8 border-t border-border mt-8 flex flex-col gap-3">
+            {showBlockInput ? (
+              <div className="flex w-full gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Reason for blocking..."
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleBlock()}
+                  className="flex-1 bg-muted/30 border border-border rounded-lg px-3 text-sm outline-none focus:border-red-500 transition-colors"
+                  autoComplete="off"
+                />
+                <Button size="sm" variant="destructive" onClick={handleBlock}>
+                  Submit
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setShowBlockInput(false);
+                  setBlockReason("");
+                }}>
+                  Cancel
+                </Button>
+              </div>
+            ) : showDeleteConfirm ? (
+              <div className="flex w-full gap-2">
+                <Button size="sm" variant="destructive" className="flex-1" onClick={handleDelete}>
+                  Confirm Delete
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                {task.status !== "Done" && (
+                  <div className="flex gap-2 w-full">
+                    <Button variant="default" className="flex-1 gap-2" onClick={handleComplete}>
+                      <CheckCircle2 className="w-4 h-4" /> Complete
+                    </Button>
+                    <Button variant="outline" className="flex-1 gap-2" onClick={handleSkip}>
+                      <SkipForward className="w-4 h-4" /> Skip
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="flex gap-2 w-full mt-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 gap-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20" 
+                    onClick={() => setShowBlockInput(true)}
+                  >
+                    <AlertCircle className="w-4 h-4" /> Block
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 gap-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20" 
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
   );
