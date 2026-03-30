@@ -250,7 +250,7 @@ export default async function CockpitPage() {
                     <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                         <Bot className="w-4 h-4" /> Agent Activity
                     </h2>
-                    <Link href="/terminal" className="text-xs text-primary hover:underline">Terminal →</Link>
+                    <Link href="/agents" className="text-xs text-primary hover:underline">Agents →</Link>
                 </div>
                 <AgentFeed limit={8} initialData={delegations} />
             </div>

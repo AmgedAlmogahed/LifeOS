@@ -5,6 +5,7 @@ import { ContextBar } from "./context-bar";
 import { Sidebar } from "./sidebar";
 import { QuickCaptureModal } from "@/components/features/quick-capture-modal";
 import { QuickCaptureButton } from "@/components/features/quick-capture-button";
+import { CompanyFilterProvider } from "@/components/providers/company-filter-context";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function AppShell({ children, inboxCount = 0 }: { children: React.ReactNo
     }, [pathname]);
 
     return (
+        <CompanyFilterProvider>
         <div className="flex flex-col min-h-screen bg-background text-foreground">
              {/* Context Bar — mode-aware top nav */}
              <ContextBar
@@ -78,5 +80,6 @@ export function AppShell({ children, inboxCount = 0 }: { children: React.ReactNo
              {/* Global Capture Modal */}
              <QuickCaptureModal isOpen={isCaptureOpen} onClose={() => setIsCaptureOpen(false)} />
         </div>
+        </CompanyFilterProvider>
     );
 }

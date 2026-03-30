@@ -42,7 +42,7 @@ export function LoginForm() {
         });
         if (error) throw error;
       }
-      router.push("/dashboard");
+      router.push("/cockpit");
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Authentication failed");

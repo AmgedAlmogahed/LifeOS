@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AgentReport, AuditLog, Client, Project } from "@/types/database";
-import { Bot, Shield, AlertTriangle, CheckCircle2, Clock, Terminal, Users2 } from "lucide-react";
+import { Bot, Shield, AlertTriangle, CheckCircle2, Clock, Users2 } from "lucide-react";
 import { AgentFeed } from "@/components/features/agents/AgentFeed";
 
 function timeAgo(ts: string) {
@@ -21,7 +21,7 @@ const severityStyle: Record<string, { icon: typeof AlertTriangle; cls: string; b
   info: { icon: Shield, cls: "level-info", bg: "level-bg-info" },
 };
 
-export function AgentTerminal({ reports, auditLogs, clients, projects, delegations }: {
+export function AgentsClient({ reports, auditLogs, clients, projects, delegations }: {
   reports: AgentReport[]; auditLogs: AuditLog[]; clients: Pick<Client, "id" | "name">[]; projects: Pick<Project, "id" | "name">[]; delegations: any[];
 }) {
   const [tab, setTab] = useState<"reports" | "audit" | "delegations">("reports");
@@ -36,8 +36,8 @@ export function AgentTerminal({ reports, auditLogs, clients, projects, delegatio
     <div className="flex flex-col h-full">
       <div className="h-14 border-b border-border flex items-center px-6 bg-card/40 backdrop-blur-sm shrink-0 gap-4">
         <Bot className="w-4 h-4 text-primary" />
-        <span className="text-sm font-bold text-foreground">Agent Terminal</span>
-        <span className="text-xs text-muted-foreground">Son of Anton</span>
+        <span className="text-sm font-bold text-foreground">Agents</span>
+        <span className="text-xs text-muted-foreground">AI Agent Activity & Delegation</span>
         <div className="ml-auto flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-emerald-500 status-blink" />
@@ -52,7 +52,7 @@ export function AgentTerminal({ reports, auditLogs, clients, projects, delegatio
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4 fade-in">
-        {/* ─── Tab + Filter ────────────────────────────────────── */}
+        {/* Tab + Filter */}
         <div className="flex items-center gap-4">
           <div className="flex gap-1 p-1 bg-accent/30 rounded-lg">
             {(["reports", "audit", "delegations"] as const).map((t) => (
@@ -74,7 +74,7 @@ export function AgentTerminal({ reports, auditLogs, clients, projects, delegatio
           )}
         </div>
 
-        {/* ─── Agent Reports ──────────────────────────────────── */}
+        {/* Agent Reports */}
         {tab === "reports" && (
           <div className="space-y-2.5">
             {filteredReports.length === 0 ? (
@@ -111,7 +111,7 @@ export function AgentTerminal({ reports, auditLogs, clients, projects, delegatio
           </div>
         )}
 
-        {/* ─── Audit Log ──────────────────────────────────────── */}
+        {/* Audit Log */}
         {tab === "audit" && (
           <div className="glass-card p-5">
             <div className="space-y-0.5 data-mono">
@@ -131,7 +131,7 @@ export function AgentTerminal({ reports, auditLogs, clients, projects, delegatio
           </div>
         )}
 
-        {/* ─── Delegations ────────────────────────────────────── */}
+        {/* Delegations */}
         {tab === "delegations" && (
           <div className="glass-card p-5">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
