@@ -84,3 +84,35 @@ export async function recordPayment(payment: PaymentInsert) {
 
     revalidatePath("/finance");
 }
+
+export async function markInvoicePaid(invoiceId: string, paymentData?: {
+    method?: string;
+    transaction_ref?: string;
+    date?: string;
+}) {
+    const supabase = await createClient();
+
+    // Fetch invoice amount
+    const { data: invoice } = await (supabase.from("invoices") as any)
+        .select("amount")
+        .eq("id", invoiceId)
+        .single();
+
+    if (!invoice) throw new Error("Invoice not found");
+
+    // Create full payment record
+    await (supabase.from("payments") as any).insert({
+        invoice_id: invoiceId,
+        amount: invoice.amount,
+        method: paymentData?.method || "Transfer",
+        transaction_ref: paymentData?.transaction_ref || null,
+        payment_date: paymentData?.date || new Date().toISOString(),
+    });
+
+    // Mark invoice as paid
+    await (supabase.from("invoices") as any)
+        .update({ status: "Paid" })
+        .eq("id", invoiceId);
+
+    revalidatePath("/finance");
+}

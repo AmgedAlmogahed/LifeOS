@@ -11,6 +11,8 @@ import {
 import { uploadFile } from "@/lib/storage";
 import { updateClientLogo } from "@/lib/actions/assets";
 
+import { ClientHealthCard } from "@/components/features/clients/ClientHealthCard";
+
 function currency(v: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v); }
 
 const stageColors: Record<string, string> = {
@@ -151,6 +153,13 @@ export function ClientDossier({
             </div>
           </div>
         </div>
+
+        {/* ─── Client Health ────────────────────────────────────── */}
+        <ClientHealthCard
+          healthScore={client.health_score}
+          agentReports={agentReports}
+          clientName={client.name}
+        />
 
         {/* ─── Contracts & Opportunities ────────────────────────────── */}
         <div className="grid grid-cols-2 gap-5">

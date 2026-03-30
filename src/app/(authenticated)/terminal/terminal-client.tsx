@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { AgentReport, AuditLog, Client, Project } from "@/types/database";
-import { Bot, Shield, AlertTriangle, CheckCircle2, Clock, Terminal } from "lucide-react";
+import { Bot, Shield, AlertTriangle, CheckCircle2, Clock, Terminal, Users2 } from "lucide-react";
+import { AgentFeed } from "@/components/features/agents/AgentFeed";
 
 function timeAgo(ts: string) {
   const d = Date.now() - new Date(ts).getTime();
@@ -20,10 +21,10 @@ const severityStyle: Record<string, { icon: typeof AlertTriangle; cls: string; b
   info: { icon: Shield, cls: "level-info", bg: "level-bg-info" },
 };
 
-export function AgentTerminal({ reports, auditLogs, clients, projects }: {
-  reports: AgentReport[]; auditLogs: AuditLog[]; clients: Pick<Client, "id" | "name">[]; projects: Pick<Project, "id" | "name">[];
+export function AgentTerminal({ reports, auditLogs, clients, projects, delegations }: {
+  reports: AgentReport[]; auditLogs: AuditLog[]; clients: Pick<Client, "id" | "name">[]; projects: Pick<Project, "id" | "name">[]; delegations: any[];
 }) {
-  const [tab, setTab] = useState<"reports" | "audit">("reports");
+  const [tab, setTab] = useState<"reports" | "audit" | "delegations">("reports");
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("all");
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]));
   const projectMap = Object.fromEntries(projects.map((p) => [p.id, p.name]));
@@ -54,10 +55,10 @@ export function AgentTerminal({ reports, auditLogs, clients, projects }: {
         {/* ─── Tab + Filter ────────────────────────────────────── */}
         <div className="flex items-center gap-4">
           <div className="flex gap-1 p-1 bg-accent/30 rounded-lg">
-            {(["reports", "audit"] as const).map((t) => (
+            {(["reports", "audit", "delegations"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                {t === "reports" ? "Reports" : "Audit Log"}
+                {t === "reports" ? "Reports" : t === "audit" ? "Audit Log" : "Delegations"}
               </button>
             ))}
           </div>
@@ -127,6 +128,16 @@ export function AgentTerminal({ reports, auditLogs, clients, projects }: {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ─── Delegations ────────────────────────────────────── */}
+        {tab === "delegations" && (
+          <div className="glass-card p-5">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Users2 className="w-3.5 h-3.5" /> Delegation Log
+            </h3>
+            <AgentFeed initialData={delegations} limit={50} />
           </div>
         )}
       </div>

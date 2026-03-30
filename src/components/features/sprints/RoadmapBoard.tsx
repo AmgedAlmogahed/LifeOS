@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { 
-  DndContext, 
+import { useState, useTransition, useMemo } from "react";
+import {
+  DndContext,
   closestCorners,
   KeyboardSensor,
   PointerSensor,
@@ -12,12 +12,9 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  defaultDropAnimationSideEffects
+  defaultDropAnimationSideEffects,
 } from "@dnd-kit/core";
-import { 
-  arrayMove, 
-  sortableKeyboardCoordinates,
-} from "@dnd-kit/sortable";
+import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Project, Sprint, Task } from "@/types/database";
 import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import { SprintControl } from "./SprintControl";
@@ -25,6 +22,11 @@ import { DroppableSprintBlock } from "./DroppableSprintBlock";
 import { SortableTaskCard } from "./SortableTaskCard";
 import { SprintReview } from "./SprintReview";
 
+const STATUSES = ["Todo", "In Progress", "Blocked", "Done"] as const;
+type Status = (typeof STATUSES)[number];
+
+/** Make a compound key from sprint/backlog id + status */
+const key = (sprintId: string, status: string) => `${sprintId}::${status}`;
 
 interface RoadmapBoardProps {
   project: Project;
@@ -34,30 +36,40 @@ interface RoadmapBoardProps {
   onTaskClick: (task: Task) => void;
   lockedTaskIds?: Set<string>;
   scopeNodes?: ScopeNode[];
+  onCreateTask?: (sprintId: string | null) => void;
 }
 
 /**
- * RoadmapBoard
+ * RoadmapBoard — corrected DnD architecture
  *
- * tasksMap is keyed by sprint_id (or "backlog").
- * DroppableSprintBlock receives a flat list of tasks and handles status grouping internally.
- * Drag-and-drop between sprint sections updates sprint_id.
- * Drag-and-drop between Kanban columns (within a sprint) updates status.
- * The droppable IDs from DroppableSprintBlock columns follow `{sprintId}::{status}`.
+ * `tasksMap` is ALWAYS keyed as `{sprintId|"backlog"}::{status}`.
+ * Each KanbanColumn droppable id matches exactly one key in tasksMap.
+ * This means dnd-kit can unambiguously track which column owns which tasks.
+ *
+ * DroppableSprintBlock receives `tasksByColumn: Record<Status, Task[]>` (pre-grouped).
+ * For the list view, it still renders a single flat list derived from that same map.
  */
-export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskClick, lockedTaskIds = new Set(), scopeNodes = [] }: RoadmapBoardProps) {
+export function RoadmapBoard({
+  project, sprints, tasks, activeScopeId, onTaskClick,
+  lockedTaskIds = new Set(), scopeNodes = [], onCreateTask,
+}: RoadmapBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [conflictSprintToClose, setConflictSprintToClose] = useState<Sprint | null>(null);
-  const concurrentlyActiveSprint = sprints.find(s => s.status === 'active');
+  const concurrentlyActiveSprint = sprints.find(s => s.status === "active");
 
-  // tasksMap keys: sprint.id OR "backlog" → flat array of tasks
+  // ── tasksMap: keyed by "{sprintId|backlog}::{status}" ────────────────────
   const [tasksMap, setTasksMap] = useState<Record<string, Task[]>>(() => {
-    const map: Record<string, Task[]> = { backlog: [] };
-    sprints.forEach(s => { map[s.id] = []; });
+    const map: Record<string, Task[]> = {};
+    const sections = ["backlog", ...sprints.map(s => s.id)];
+    sections.forEach(sec => STATUSES.forEach(st => { map[key(sec, st)] = []; }));
+
     tasks.forEach(t => {
-      const key = t.sprint_id && map[t.sprint_id] !== undefined ? t.sprint_id : "backlog";
-      map[key].push(t);
+      const sec = t.sprint_id && sections.includes(t.sprint_id) ? t.sprint_id : "backlog";
+      const st = STATUSES.includes(t.status as Status) ? t.status : "Todo";
+      const k = key(sec, st);
+      map[k] = map[k] ?? [];
+      map[k].push(t);
     });
     return map;
   });
@@ -67,110 +79,93 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveId(active.id as string);
-  };
-
-  /**
-   * findContainer returns the sprint/backlog key for a given task ID or droppable ID.
-   * Droppable column IDs come in as `{sprintId}::{status}`, so we strip the status suffix.
-   */
+  // ── findContainer: map a task id → its column key ────────────────────────
   const findContainer = (id: string): string | undefined => {
-    // Direct key match (e.g., "backlog" or a sprint id itself)
-    if (id in tasksMap) return id;
-
-    // Column droppable: "{sprintId}::{status}" or "backlog::{status}"
-    if (id.includes("::")) {
-      const [sprintPart] = id.split("::");
-      if (sprintPart in tasksMap) return sprintPart;
-    }
-
-    // Task id – find which container holds it
-    for (const key of Object.keys(tasksMap)) {
-      if (tasksMap[key].some(task => task.id === id)) return key;
+    if (id in tasksMap) return id; // it's already a column key
+    for (const k of Object.keys(tasksMap)) {
+      if (tasksMap[k].some(t => t.id === id)) return k;
     }
     return undefined;
   };
 
+  // ── handleDragStart ───────────────────────────────────────────────────────
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveId(active.id as string);
+  };
+
+  // ── handleDragOver: optimistic UI ────────────────────────────────────────
   const handleDragOver = ({ active, over }: DragOverEvent) => {
     if (!over) return;
     const activeTaskId = active.id as string;
     const overId = over.id as string;
 
-    const activeContainer = findContainer(activeTaskId);
-    const overContainer = findContainer(overId);
+    const activeCol = findContainer(activeTaskId);
+    // The over target is either a column key directly, or a task id inside a column
+    const overCol = findContainer(overId) ?? (overId in tasksMap ? overId : undefined);
 
-    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+    if (!activeCol || !overCol || activeCol === overCol) return;
 
     setTasksMap(prev => {
-      const activeItems = prev[activeContainer] || [];
-      const overItems = prev[overContainer] || [];
-      const activeIndex = activeItems.findIndex(t => t.id === activeTaskId);
-      const overTaskIndex = overItems.findIndex(t => t.id === overId);
+      const activeItems = [...(prev[activeCol] ?? [])];
+      const overItems = [...(prev[overCol] ?? [])];
+      const fromIdx = activeItems.findIndex(t => t.id === activeTaskId);
+      if (fromIdx === -1) return prev;
 
-      const newIndex = overTaskIndex >= 0 ? overTaskIndex : overItems.length;
-      const draggedItem = activeItems[activeIndex];
-      if (!draggedItem) return prev;
+      const [draggedTask] = activeItems.splice(fromIdx, 1);
 
-      // Optimistically update status if dropped into a status column
-      let updatedItem = draggedItem;
-      if (overId.includes("::")) {
-        const [, overStatus] = overId.split("::");
-        updatedItem = { ...draggedItem, status: overStatus as Task["status"] };
-      }
+      // Derive the status from the destination column key
+      const [, newStatus] = overCol.split("::");
+      const updatedTask = { ...draggedTask, status: newStatus as Task["status"] };
 
-      return {
-        ...prev,
-        [activeContainer]: activeItems.filter(item => item.id !== activeTaskId),
-        [overContainer]: [
-          ...overItems.slice(0, newIndex),
-          updatedItem,
-          ...overItems.slice(newIndex),
-        ],
-      };
+      // Insert at correct position in destination
+      const overTaskIdx = overItems.findIndex(t => t.id === overId);
+      const insertAt = overTaskIdx >= 0 ? overTaskIdx : overItems.length;
+      overItems.splice(insertAt, 0, updatedTask);
+
+      return { ...prev, [activeCol]: activeItems, [overCol]: overItems };
     });
   };
 
+  // ── handleDragEnd: persist to DB ─────────────────────────────────────────
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveId(null);
     if (!over) return;
 
     const activeTaskId = active.id as string;
     const overId = over.id as string;
-    const activeContainer = findContainer(activeTaskId);
-    const overContainer = findContainer(overId);
 
-    if (!activeContainer || !overContainer) return;
+    const activeCol = findContainer(activeTaskId);
+    const overCol = findContainer(overId) ?? (overId in tasksMap ? overId : undefined);
 
-    // Find the original task from the server data list
-    const activeTask = tasks.find(t => t.id === activeTaskId);
-    if (!activeTask) return;
+    if (!activeCol) return;
 
-    const targetSprintId = overContainer === "backlog" ? null : overContainer;
+    const originalTask = tasks.find(t => t.id === activeTaskId);
+    if (!originalTask) return;
 
-    // Determine status change from column id
-    let targetStatus: string | undefined;
-    if (overId.includes("::")) {
-      const [, status] = overId.split("::");
-      targetStatus = status;
-    }
-
-    const hasSprintChanged = activeTask.sprint_id !== targetSprintId;
-    const hasStatusChanged = targetStatus && activeTask.status !== targetStatus;
-
-    if (activeContainer === overContainer) {
-      // Reorder within same container
-      const activeIndex = tasksMap[activeContainer].findIndex(t => t.id === activeTaskId);
-      const overIndex = tasksMap[activeContainer].findIndex(t => t.id === overId);
-      if (activeIndex !== overIndex && activeIndex >= 0 && overIndex >= 0) {
-        setTasksMap(items => ({
-          ...items,
-          [activeContainer]: arrayMove(items[activeContainer] || [], activeIndex, overIndex),
-        }));
+    if (!overCol || activeCol === overCol) {
+      // Reorder within same column
+      if (overCol === activeCol) {
+        const colItems = tasksMap[activeCol] ?? [];
+        const fromIdx = colItems.findIndex(t => t.id === activeTaskId);
+        const toIdx = colItems.findIndex(t => t.id === overId);
+        if (fromIdx !== toIdx && fromIdx >= 0 && toIdx >= 0) {
+          setTasksMap(prev => ({
+            ...prev,
+            [activeCol]: arrayMove([...(prev[activeCol] ?? [])], fromIdx, toIdx),
+          }));
+        }
       }
+      return;
     }
 
-    // Persist changes
+    // Determine what changed
+    const [overSec, overStatus] = overCol.split("::");
+    const [origSec] = activeCol.split("::");
+
+    const targetSprintId = overSec === "backlog" ? null : overSec;
+    const hasSprintChanged = (originalTask.sprint_id ?? null) !== targetSprintId;
+    const hasStatusChanged = originalTask.status !== overStatus;
+
     if (hasSprintChanged || hasStatusChanged) {
       startTransition(async () => {
         if (hasSprintChanged) {
@@ -179,11 +174,21 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
         }
         if (hasStatusChanged) {
           const { updateTaskStatus } = await import("@/lib/actions/flow-board");
-          await updateTaskStatus(activeTaskId, targetStatus as any);
+          await updateTaskStatus(activeTaskId, overStatus as any);
         }
       });
     }
   };
+
+  // ── Derive per-sprint grouped data for DroppableSprintBlock ──────────────
+  const getTasksByColumn = (sprintId: string): Record<Status, Task[]> => {
+    const result = {} as Record<Status, Task[]>;
+    STATUSES.forEach(st => { result[st] = tasksMap[key(sprintId, st)] ?? []; });
+    return result;
+  };
+
+  const getFlatTasks = (sprintId: string): Task[] =>
+    STATUSES.flatMap(st => tasksMap[key(sprintId, st)] ?? []);
 
   const handleStartSprintRequest = (sprintToStart: Sprint) => {
     if (concurrentlyActiveSprint && concurrentlyActiveSprint.id !== sprintToStart.id) {
@@ -192,18 +197,23 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
       startTransition(async () => {
         const { startSprint } = await import("@/lib/actions/sprints");
         const res = await startSprint(sprintToStart.id, project.id);
-        if (res?.error) {
-          alert(res.error);
-        }
+        if (res?.error) alert(res.error);
       });
     }
   };
 
-  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
-  const backlogTasks = tasksMap["backlog"] || [];
+  // The drag overlay shows the ghost card
+  const activeTask = useMemo(
+    () => activeId ? tasks.find(t => t.id === activeId) ?? null : null,
+    [activeId, tasks]
+  );
+
+  const backlogByColumn = getTasksByColumn("backlog");
+  const backlogFlat = getFlatTasks("backlog");
 
   return (
     <DndContext
+      id="roadmap-dnd"
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
@@ -211,31 +221,37 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
       onDragEnd={handleDragEnd}
     >
       <div className="p-4 space-y-6 pb-32">
-        {/* Sprints Timeline */}
+
         {sprints.length === 0 ? (
           <div>
-            <SprintControl project={project} activeSprint={null} tasks={backlogTasks} />
+            <SprintControl project={project} activeSprint={null} tasks={backlogFlat} />
           </div>
         ) : (
           <div className="space-y-6">
-            {sprints.map((sprint) => (
-              <DroppableSprintBlock
-                key={sprint.id}
-                sprint={sprint}
-                project={project}
-                tasks={tasksMap[sprint.id] || []}
-                isHighlighted={!!activeScopeId && (tasksMap[sprint.id] || []).length > 0}
-                onTaskClick={onTaskClick}
-                onStartRequest={() => handleStartSprintRequest(sprint)}
-                lockedTaskIds={lockedTaskIds}
-                scopeNodes={scopeNodes}
-              />
-            ))}
+            {sprints.map(sprint => {
+              const byCol = getTasksByColumn(sprint.id);
+              const flat = getFlatTasks(sprint.id);
+              return (
+                <DroppableSprintBlock
+                  key={sprint.id}
+                  sectionId={sprint.id}
+                  sprint={sprint}
+                  project={project}
+                  tasksByColumn={byCol}
+                  flatTasks={flat}
+                  isHighlighted={!!activeScopeId && flat.length > 0}
+                  onTaskClick={onTaskClick}
+                  onStartRequest={() => handleStartSprintRequest(sprint)}
+                  onCreateTask={onCreateTask ? () => onCreateTask(sprint.id) : undefined}
+                  lockedTaskIds={lockedTaskIds}
+                  scopeNodes={scopeNodes}
+                />
+              );
+            })}
 
-            {/* Plan next sprint prompt if none is in planning */}
             {sprints[sprints.length - 1].status !== "planning" && (
               <div className="pt-4 border-t border-border flex justify-center">
-                <SprintControl project={project} activeSprint={null} tasks={backlogTasks} />
+                <SprintControl project={project} activeSprint={null} tasks={backlogFlat} />
               </div>
             )}
           </div>
@@ -244,18 +260,20 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
         {/* Backlog */}
         <div className="pt-6 border-t-2 border-dashed border-border/50">
           <DroppableSprintBlock
+            sectionId="backlog"
             isBacklog
-            sprintId="backlog"
-            tasks={backlogTasks}
-            isHighlighted={!!activeScopeId && backlogTasks.length > 0}
+            tasksByColumn={backlogByColumn}
+            flatTasks={backlogFlat}
+            isHighlighted={!!activeScopeId && backlogFlat.length > 0}
             onTaskClick={onTaskClick}
+            onCreateTask={onCreateTask ? () => onCreateTask(null) : undefined}
             lockedTaskIds={lockedTaskIds}
             scopeNodes={scopeNodes}
           />
         </div>
       </div>
 
-      <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.4" } } })}}>
+      <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.4" } } }) }}>
         {activeTask ? (
           <div className="opacity-80 rotate-2 scale-105 cursor-grabbing">
             <SortableTaskCard task={activeTask} onTaskClick={() => {}} />
@@ -263,13 +281,12 @@ export function RoadmapBoard({ project, sprints, tasks, activeScopeId, onTaskCli
         ) : null}
       </DragOverlay>
 
-      {/* Conflict Resolution: close old sprint before starting new */}
       {conflictSprintToClose && (
         <SprintReview
           sprint={conflictSprintToClose}
-          tasks={tasksMap[conflictSprintToClose.id] || []}
+          tasks={getFlatTasks(conflictSprintToClose.id)}
           open={!!conflictSprintToClose}
-          onOpenChange={(open) => !open && setConflictSprintToClose(null)}
+          onOpenChange={open => !open && setConflictSprintToClose(null)}
         />
       )}
     </DndContext>

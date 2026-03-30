@@ -11,12 +11,15 @@ import { CurrentTaskZone } from "./CurrentTaskZone";
 import { TodayQueueZone } from "./TodayQueueZone";
 import { SprintBacklogZone } from "./SprintBacklogZone";
 import { BoardView } from "./BoardView";
+import { FocusTimer } from "./FocusTimer";
+import { DebriefModal } from "./DebriefModal";
 import { Button } from "@/components/ui/button";
-import { Clock, Play, LayoutTemplate, KanbanSquare, LogOut } from "lucide-react";
+import { Clock, Play, LayoutTemplate, KanbanSquare, LogOut, Focus, Lock } from "lucide-react";
 import { endFocusSession } from "@/lib/actions/focus-sessions";
 import { DoneRibbon } from "./DoneRibbon";
 import { SprintReview } from "../sprints/SprintReview";
 import { TaskDetailSheet } from "../tasks/TaskDetailSheet";
+import { DelegateModal } from "../tasks/DelegateModal";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, useDroppable } from "@dnd-kit/core";
 import { moveTaskToSprint, updateTaskStatus, toggleTaskCurrent } from "@/lib/actions/flow-board";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -52,11 +55,19 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
     const [showSprintReview, setShowSprintReview] = useState(false);
     const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
+    // Lock Mode (Deep Focus) state
+    const [lockMode, setLockMode] = useState(false);
+    const [showDebrief, setShowDebrief] = useState(false);
+
     // Task Detail Sheet state (Phase 2)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
 
+    // Delegate modal state
+    const [delegatingTask, setDelegatingTask] = useState<Task | null>(null);
+
     const handleTaskClick = (task: Task) => {
+        if (lockMode) return; // No task sheet in lock mode
         setSelectedTask(task);
         setIsTaskSheetOpen(true);
     };
@@ -205,28 +216,60 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
     };
 
     return (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={lockMode ? [] : sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="h-full flex flex-col gap-6 relative px-4 md:px-6 pt-4 pb-16">
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-3 shrink-0">
-                    {/* Session indicator — always active (no toggle needed) */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 rounded-full border border-green-500/20">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs font-semibold">Focused</span>
+                    {/* Session indicator */}
+                    <div className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-full border",
+                        lockMode
+                            ? "bg-red-500/10 text-red-600 border-red-500/20"
+                            : "bg-green-500/10 text-green-600 border-green-500/20"
+                    )}>
+                        <span className={cn(
+                            "w-2 h-2 rounded-full animate-pulse",
+                            lockMode ? "bg-red-500" : "bg-green-500"
+                        )} />
+                        <span className="text-xs font-semibold">{lockMode ? "Deep Focus" : "Focused"}</span>
+                        {lockMode && <Lock className="w-3 h-3" />}
                     </div>
 
-                    {/* End Session button */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowEndModal(true)}
-                        className="text-muted-foreground hover:text-red-500 transition-colors"
-                    >
-                        <LogOut className="w-4 h-4 mr-1" />
-                        <span className="text-xs">End Session</span>
-                    </Button>
+                    {/* End Session / Debrief button */}
+                    {lockMode ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowDebrief(true)}
+                            className="text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4 mr-1" />
+                            <span className="text-xs">End Session</span>
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowEndModal(true)}
+                            className="text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4 mr-1" />
+                            <span className="text-xs">End Session</span>
+                        </Button>
+                    )}
 
-                    {activeSprint && (
+                    {/* Start Focus button (only when not in lock mode and has current task) */}
+                    {!lockMode && currentTask && (
+                        <Button
+                            size="sm"
+                            onClick={() => setLockMode(true)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                        >
+                            <Focus className="w-4 h-4" /> Start Focus
+                        </Button>
+                    )}
+
+                    {activeSprint && !lockMode && (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border">
                             <span className="w-2 h-2 rounded-full bg-blue-500" />
                             <span className="text-xs font-semibold truncate max-w-[200px]">Sprint {activeSprint.sprint_number}: {activeSprint.goal}</span>
@@ -236,128 +279,158 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                         </div>
                     )}
 
-                    <div className="flex bg-muted rounded-lg p-0.5 ml-auto">
-                        <Button variant={viewMode === 'flow' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('flow')} title="Flow View">
-                            <LayoutTemplate className="w-4 h-4" />
-                        </Button>
-                        <Button variant={viewMode === 'board' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('board')} title="Board View">
-                            <KanbanSquare className="w-4 h-4" />
-                        </Button>
-                    </div>
+                    {!lockMode && (
+                        <div className="flex bg-muted rounded-lg p-0.5 ml-auto">
+                            <Button variant={viewMode === 'flow' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('flow')} title="Flow View">
+                                <LayoutTemplate className="w-4 h-4" />
+                            </Button>
+                            <Button variant={viewMode === 'board' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setViewMode('board')} title="Board View">
+                                <KanbanSquare className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
-                {/* Zones Layout (Flow Mode) */}
-                {viewMode === 'flow' && (
-                    <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-y-auto scrollbar-thin">
-
-                        {/* Zone 1: Current Task */}
-                        <DroppableZone id="current-zone" className="shrink-0">
-                            {currentTask ? (
-                                <CurrentTaskZone
-                                    task={currentTask}
-                                    session={activeSession}
-                                    projectId={project.id}
-                                    onTaskClick={handleTaskClick}
-                                />
-                            ) : (
-                                /* Empty State / Suggestion */
-                                (() => {
-                                    const suggestedTask = queueTasks[0] || sprintRemainderTasks[0] || backlogTasks[0];
-
-                                    if (suggestedTask) {
-                                        return (
-                                            <div className="bg-card rounded-xl border border-primary/20 shadow-lg p-6 relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-1 h-full bg-primary/20" />
-                                                <div className="flex flex-col gap-4">
-                                                    <div className="space-y-1">
-                                                        <span className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
-                                                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                                            What&apos;s Next?
-                                                        </span>
-                                                        <h3 className="text-xl font-bold">{suggestedTask.title}</h3>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {suggestedTask.sprint_id ? "From current sprint" : "From backlog"} &bull; {suggestedTask.priority} Priority
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex gap-3 pt-2">
-                                                        <Button
-                                                            onClick={async () => {
-                                                                startTransition(async () => {
-                                                                    await updateTaskStatus(suggestedTask.id, "In Progress");
-                                                                    await toggleTaskCurrent(suggestedTask.id, project.id);
-                                                                });
-                                                            }}
-                                                            className="w-full sm:w-auto"
-                                                        >
-                                                            <Play className="w-4 h-4 mr-2" /> Start This Task
-                                                        </Button>
-                                                        <Button variant="outline" className="w-full sm:w-auto">
-                                                            Pick from Queue
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    } else {
-                                        return (
-                                            <div className="h-48 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/10">
-                                                <Clock className="w-8 h-8 opacity-20" />
-                                                <p className="text-sm">No tasks available. Add some to get started!</p>
-                                            </div>
-                                        );
-                                    }
-                                })()
-                            )}
-                        </DroppableZone>
-
-                        {/* Zone 2: Queue */}
-                        <DroppableZone id="queue-zone" className="shrink-0">
-                            <TodayQueueZone
-                                tasks={queueTasks}
+                {/* LOCK MODE: Only show current task + timer */}
+                {lockMode && currentTask ? (
+                    <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-y-auto scrollbar-thin">
+                        {/* Expanded current task in lock mode */}
+                        <div className="w-full max-w-2xl space-y-6">
+                            <CurrentTaskZone
+                                task={currentTask}
+                                session={activeSession}
                                 projectId={project.id}
-                                sprintTaskCount={sprintRemainderTasks.length}
                                 onTaskClick={handleTaskClick}
                             />
-                        </DroppableZone>
-
-                        {/* Zone 3: Boards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <DroppableZone id="sprint-backlog-zone" className="min-h-[200px]">
-                                <SprintBacklogZone
-                                    tasks={sprintRemainderTasks}
-                                    completedTasks={completedTasks}
-                                    projectId={project.id}
-                                    onTaskClick={handleTaskClick}
-                                />
-                            </DroppableZone>
-                            <DroppableZone id="project-backlog-zone" className="min-h-[200px] border-l border-border/50 pl-6 border-dashed">
-                                <div className="mb-4">
-                                    <h3 className="text-sm font-medium text-muted-foreground">Project Backlog</h3>
-                                    <p className="text-xs text-muted-foreground/60">Tasks not in sprint</p>
-                                </div>
-                                <SprintBacklogZone
-                                    tasks={backlogTasks}
-                                    completedTasks={[]}
-                                    projectId={project.id}
-                                    onTaskClick={handleTaskClick}
-                                />
-                            </DroppableZone>
+                            <FocusTimer
+                                sessionId={activeSession.id}
+                                taskTitle={currentTask.title}
+                                estimatedMinutes={(currentTask as any).estimated_minutes || null}
+                                startedAt={activeSession.started_at}
+                                onSessionEnd={() => setShowDebrief(true)}
+                            />
                         </div>
                     </div>
+                ) : (
+                    /* Normal view modes */
+                    <>
+                        {/* Zones Layout (Flow Mode) */}
+                        {viewMode === 'flow' && (
+                            <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-y-auto scrollbar-thin">
+
+                                {/* Zone 1: Current Task */}
+                                <DroppableZone id="current-zone" className="shrink-0">
+                                    {currentTask ? (
+                                        <CurrentTaskZone
+                                            task={currentTask}
+                                            session={activeSession}
+                                            projectId={project.id}
+                                            onTaskClick={handleTaskClick}
+                                        />
+                                    ) : (
+                                        /* Empty State / Suggestion */
+                                        (() => {
+                                            const suggestedTask = queueTasks[0] || sprintRemainderTasks[0] || backlogTasks[0];
+
+                                            if (suggestedTask) {
+                                                return (
+                                                    <div className="bg-card rounded-xl border border-primary/20 shadow-lg p-6 relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20" />
+                                                        <div className="flex flex-col gap-4">
+                                                            <div className="space-y-1">
+                                                                <span className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-2">
+                                                                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                                    What&apos;s Next?
+                                                                </span>
+                                                                <h3 className="text-xl font-bold">{suggestedTask.title}</h3>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {suggestedTask.sprint_id ? "From current sprint" : "From backlog"} &bull; {suggestedTask.priority} Priority
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="flex gap-3 pt-2">
+                                                                <Button
+                                                                    onClick={async () => {
+                                                                        startTransition(async () => {
+                                                                            await updateTaskStatus(suggestedTask.id, "In Progress");
+                                                                            await toggleTaskCurrent(suggestedTask.id, project.id);
+                                                                        });
+                                                                    }}
+                                                                    className="w-full sm:w-auto"
+                                                                >
+                                                                    <Play className="w-4 h-4 mr-2" /> Start This Task
+                                                                </Button>
+                                                                <Button variant="outline" className="w-full sm:w-auto">
+                                                                    Pick from Queue
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            } else {
+                                                return (
+                                                    <div className="h-48 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/10">
+                                                        <Clock className="w-8 h-8 opacity-20" />
+                                                        <p className="text-sm">No tasks available. Add some to get started!</p>
+                                                    </div>
+                                                );
+                                            }
+                                        })()
+                                    )}
+                                </DroppableZone>
+
+                                {/* Zone 2: Queue */}
+                                <DroppableZone id="queue-zone" className="shrink-0">
+                                    <TodayQueueZone
+                                        tasks={queueTasks}
+                                        projectId={project.id}
+                                        sprintTaskCount={sprintRemainderTasks.length}
+                                        onTaskClick={handleTaskClick}
+                                        onDelegate={(task) => setDelegatingTask(task)}
+                                    />
+                                </DroppableZone>
+
+                                {/* Zone 3: Boards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <DroppableZone id="sprint-backlog-zone" className="min-h-[200px]">
+                                        <SprintBacklogZone
+                                            tasks={sprintRemainderTasks}
+                                            completedTasks={completedTasks}
+                                            projectId={project.id}
+                                            onTaskClick={handleTaskClick}
+                                        />
+                                    </DroppableZone>
+                                    <DroppableZone id="project-backlog-zone" className="min-h-[200px] border-l border-border/50 pl-6 border-dashed">
+                                        <div className="mb-4">
+                                            <h3 className="text-sm font-medium text-muted-foreground">Project Backlog</h3>
+                                            <p className="text-xs text-muted-foreground/60">Tasks not in sprint</p>
+                                        </div>
+                                        <SprintBacklogZone
+                                            tasks={backlogTasks}
+                                            completedTasks={[]}
+                                            projectId={project.id}
+                                            onTaskClick={handleTaskClick}
+                                        />
+                                    </DroppableZone>
+                                </div>
+                            </div>
+                        )}
+
+                        {viewMode === 'board' && (
+                            <BoardView tasks={tasks} activeSprint={activeSprint} projectId={project.id} onTaskClick={handleTaskClick} />
+                        )}
+                    </>
                 )}
 
-                {viewMode === 'board' && (
-                    <BoardView tasks={tasks} activeSprint={activeSprint} projectId={project.id} onTaskClick={handleTaskClick} />
+                {/* Persistent Done Ribbon (hidden in lock mode) */}
+                {!lockMode && (
+                    <DoneRibbon
+                        completedTasks={completedTasks}
+                        activeSprint={activeSprint}
+                        allSprintTasks={sprintTasks}
+                        committedTasksToday={queueTasks.concat(completedTasks.filter(t => t.committed_date === today))}
+                    />
                 )}
-
-                {/* Persistent Done Ribbon */}
-                <DoneRibbon
-                    completedTasks={completedTasks}
-                    activeSprint={activeSprint}
-                    allSprintTasks={sprintTasks}
-                    committedTasksToday={queueTasks.concat(completedTasks.filter(t => t.committed_date === today))}
-                />
 
                 {/* Sprint Review Modal */}
                 {activeSprint && (
@@ -378,17 +451,45 @@ export function FlowBoard({ project, activeSprint, tasks, activeSession }: FlowB
                 </DragOverlay>
 
                 {/* Task Detail Sheet (Phase 2) */}
-                <TaskDetailSheet
-                    task={selectedTask}
-                    open={isTaskSheetOpen}
-                    onOpenChange={(open) => {
-                        setIsTaskSheetOpen(open);
-                        if (!open) setSelectedTask(null);
-                    }}
-                    projectName={project.name}
-                />
+                {!lockMode && (
+                    <TaskDetailSheet
+                        task={selectedTask}
+                        open={isTaskSheetOpen}
+                        onOpenChange={(open) => {
+                            setIsTaskSheetOpen(open);
+                            if (!open) setSelectedTask(null);
+                        }}
+                        projectName={project.name}
+                    />
+                )}
 
-                {/* End Session Modal (Navigation Guard) */}
+                {/* Delegate Modal */}
+                {delegatingTask && (
+                    <DelegateModal
+                        taskId={delegatingTask.id}
+                        isOpen={!!delegatingTask}
+                        onClose={() => setDelegatingTask(null)}
+                        taskCategory={(delegatingTask as any).category}
+                    />
+                )}
+
+                {/* Forced Debrief Modal (Lock Mode) */}
+                {currentTask && (
+                    <DebriefModal
+                        isOpen={showDebrief}
+                        sessionId={activeSession.id}
+                        projectId={project.id}
+                        taskId={currentTask.id}
+                        taskTitle={currentTask.title}
+                        onComplete={() => {
+                            setShowDebrief(false);
+                            setLockMode(false);
+                            router.push("/cockpit");
+                        }}
+                    />
+                )}
+
+                {/* End Session Modal (Navigation Guard — non-lock-mode only) */}
                 <Dialog open={showEndModal} onOpenChange={(open) => !open && handleCancelEnd()}>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>

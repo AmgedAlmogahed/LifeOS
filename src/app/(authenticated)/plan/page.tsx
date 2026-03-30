@@ -72,8 +72,8 @@ export default async function PlanPage() {
 
     return (
         <div className="container max-w-3xl py-8 px-4">
-             <h1 className="text-2xl font-bold mb-2">Evening Plan</h1>
-             <p className="text-muted-foreground mb-8">Reflect on today, prepare for tomorrow.</p>
+             <h1 className="text-2xl font-bold mb-2">Daily Plan</h1>
+             <p className="text-muted-foreground mb-8">Plan your day, reflect on progress.</p>
              <PlanEditor 
                 initialPlan={plan} 
                 recommendation={recommendationResult}

@@ -39,6 +39,16 @@ export type CaptureSource = "web" | "telegram" | "voice" | "agent";
 export type CaptureStatus = "captured" | "processed" | "dismissed";
 export type HealthDimension = "financial" | "business" | "operations" | "personal";
 
+// New enum types for added tables
+export type EnergyLevel = "deep" | "shallow" | "admin";
+export type ExpenseCategory = "Infrastructure" | "Tools" | "Subscriptions" | "Office" | "Travel" | "Contractor" | "Marketing" | "Legal" | "Other";
+export type DelegationStatus = "pending" | "in_progress" | "completed" | "failed";
+export type RecurringFrequency = "weekly" | "monthly" | "quarterly" | "yearly";
+export type TaxRecordStatus = "draft" | "filed" | "paid";
+export type TransactionDirection = "inflow" | "outflow";
+export type TimeBlockType = "focus" | "admin" | "break";
+export type StateSnapshotTrigger = "focus_exit" | "daily_review" | "manual";
+
 // ─── Row Type Aliases (from generated Tables helper) ────────────────────────
 import type { Tables as T, TablesInsert as TI, TablesUpdate as TU } from "./supabase";
 
@@ -83,6 +93,126 @@ export type FocusSession = T<"focus_sessions">;
 export type DailyPlan = T<"daily_plans">;
 export type QuickCapture = T<"quick_captures">;
 export type HealthSnapshot = T<"health_snapshots">;
+
+// ─── Manual Interfaces for New Tables (not yet in generated supabase.ts) ─────
+
+export interface ProjectStateContext {
+  id: string;
+  project_id: string;
+  context_summary: string;
+  current_blockers: string[];
+  last_decision: string;
+  next_action: string;
+  updated_at: string;
+}
+
+export interface StateSnapshot {
+  id: string;
+  project_id: string;
+  snapshot_text: string;
+  trigger: StateSnapshotTrigger;
+  created_at: string;
+}
+
+export interface DelegationLogEntry {
+  id: string;
+  task_id: string;
+  agent_id: string;
+  delegated_at: string;
+  status: DelegationStatus;
+  result_summary: string | null;
+  completed_at: string | null;
+}
+
+export interface Expense {
+  id: string;
+  project_id: string | null;
+  description: string;
+  amount: number;
+  vat_amount: number;
+  category: ExpenseCategory;
+  receipt_url: string;
+  vendor_name: string;
+  expense_date: string;
+  is_recurring: boolean;
+  recurring_expense_id: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  amount: number;
+  vat_amount: number;
+  category: ExpenseCategory;
+  frequency: RecurringFrequency;
+  vendor_name: string;
+  next_due_date: string | null;
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaxRecord {
+  id: string;
+  period_start: string;
+  period_end: string;
+  vat_collected: number;
+  vat_paid: number;
+  net_vat_liability: number;
+  status: TaxRecordStatus;
+  filing_reference: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankTransaction {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  direction: TransactionDirection;
+  description: string;
+  reference: string;
+  matched_invoice_id: string | null;
+  matched_expense_id: string | null;
+  is_reconciled: boolean;
+  reconciled_at: string | null;
+  notes: string;
+  created_at: string;
+}
+
+export interface TimeBlock {
+  start: string;
+  end: string;
+  task_id: string | null;
+  type: TimeBlockType;
+}
+
+export interface EnergyCurve {
+  morning: number;
+  afternoon: number;
+  evening: number;
+}
+
+// Extended field types for Task (columns exist in DB but not in generated types)
+export interface TaskExtended extends Task {
+  energy_level?: EnergyLevel;
+  estimated_minutes?: number | null;
+  agent_assignable?: boolean;
+  assigned_agent?: string | null;
+  start_date?: string | null;
+}
+
+// Extended field types for DailyPlan (columns exist in DB but not in generated types)
+export interface DailyPlanExtended extends DailyPlan {
+  time_blocks?: TimeBlock[] | null;
+  energy_curve?: EnergyCurve | null;
+  plan_version?: number;
+}
 
 // ─── Insert Type Aliases ────────────────────────────────────────────────────
 export type ClientInsert = TI<"clients">;
@@ -131,6 +261,21 @@ export type DocumentUpdate = TU<"documents">;
 export type MilestoneUpdate = TU<"milestones">;
 export type ModuleUpdate = TU<"modules">;
 
+// ─── Partial Types for New Table Inserts/Updates ────────────────────────────
+export type ProjectStateContextInsert = Omit<ProjectStateContext, 'id' | 'updated_at'> & { id?: string; updated_at?: string };
+export type ProjectStateContextUpdate = Partial<Omit<ProjectStateContext, 'id'>>;
+export type StateSnapshotInsert = Omit<StateSnapshot, 'id' | 'created_at'> & { id?: string; created_at?: string };
+export type DelegationLogInsert = Omit<DelegationLogEntry, 'id' | 'delegated_at' | 'completed_at' | 'result_summary'> & { id?: string; delegated_at?: string; result_summary?: string | null; completed_at?: string | null };
+export type DelegationLogUpdate = Partial<Omit<DelegationLogEntry, 'id'>>;
+export type ExpenseInsert = Omit<Expense, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+export type ExpenseUpdate = Partial<Omit<Expense, 'id'>>;
+export type RecurringExpenseInsert = Omit<RecurringExpense, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+export type RecurringExpenseUpdate = Partial<Omit<RecurringExpense, 'id'>>;
+export type TaxRecordInsert = Omit<TaxRecord, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+export type TaxRecordUpdate = Partial<Omit<TaxRecord, 'id'>>;
+export type BankTransactionInsert = Omit<BankTransaction, 'id' | 'created_at'> & { id?: string; created_at?: string };
+export type BankTransactionUpdate = Partial<Omit<BankTransaction, 'id'>>;
+
 // ─── Composite Types ────────────────────────────────────────────────────────
 
 export interface PriceOfferItem {
@@ -153,3 +298,7 @@ export interface Subtask {
     title: string;
     completed: boolean;
 }
+
+// ─── Agent ID Constants ─────────────────────────────────────────────────────
+export const AGENT_IDS = ['Secretary', 'Dev', 'Biz', 'Creative', 'Accounting'] as const;
+export type AgentId = typeof AGENT_IDS[number];

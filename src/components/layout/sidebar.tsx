@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Zap, ListTodo, CalendarDays, Moon, CalendarCheck, Inbox, Hammer,
-  Users, TrendingUp, DollarSign, MessageSquare, Handshake,
+  Users, TrendingUp, DollarSign, MessageSquare, Handshake, Receipt,
   FolderKanban, Rocket, ScrollText, ShieldCheck, Wrench, Terminal,
   Sparkles, Lock, X, ChevronRight, LayoutDashboard, Box
 } from "lucide-react";
@@ -42,6 +42,7 @@ const navGroups = [
       { href: "/pipeline", label: "Pipeline", icon: TrendingUp },
       { href: "/clients", label: "Clients", icon: Users },
       { href: "/finance", label: "Finance", icon: DollarSign },
+      { href: "/expenses", label: "Expenses", icon: Receipt },
       { href: "/comms", label: "Communications", icon: MessageSquare },
       { href: "/meetings", label: "Meetings", icon: Handshake },
     ],

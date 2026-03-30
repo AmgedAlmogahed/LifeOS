@@ -2,7 +2,7 @@
 
 import { Task } from "@/types/database";
 import { Button } from "@/components/ui/button";
-import { Play, CalendarClock } from "lucide-react";
+import { Play, CalendarClock, Users2 } from "lucide-react";
 import { toggleTaskCurrent } from "@/lib/actions/flow-board";
 import { useTransition } from "react";
 import { DraggableTaskCard } from "./DraggableTaskCard";
@@ -15,9 +15,10 @@ interface TodayQueueZoneProps {
     sprintTaskCount?: number;
     committedTodayCount?: number;
     onTaskClick?: (task: Task) => void;
+    onDelegate?: (task: Task) => void;
 }
 
-export function TodayQueueZone({ tasks, projectId, sprintTaskCount = 0, onTaskClick }: TodayQueueZoneProps) {
+export function TodayQueueZone({ tasks, projectId, sprintTaskCount = 0, onTaskClick, onDelegate }: TodayQueueZoneProps) {
     const [isPending, startTransition] = useTransition();
 
     const handleStart = (taskId: string) => {
@@ -115,6 +116,16 @@ export function TodayQueueZone({ tasks, projectId, sprintTaskCount = 0, onTaskCl
                             >
                                 <Play className="w-3 h-3 fill-current ml-0.5" />
                             </Button>
+                            {onDelegate && (
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full h-6 w-6 hover:bg-violet-500/10 hover:text-violet-500"
+                                    onClick={(e) => { e.stopPropagation(); onDelegate(task); }}
+                                >
+                                    <Users2 className="w-3 h-3" />
+                                </Button>
+                            )}
                         </div>
                     </DraggableTaskCard>
                 ))}

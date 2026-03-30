@@ -1,19 +1,24 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateRecommendation } from "@/lib/actions/recommendations";
 import { Project, Task } from "@/types/database";
-import { ArrowRight, Clock, Target, CheckCircle2, MessageSquare } from "lucide-react";
+import { ArrowRight, Bot, Calendar, Clock, LayoutGrid, Target, CheckCircle2, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { AgentFeed } from "@/components/features/agents/AgentFeed";
 
 export default async function CockpitPage() {
     const supabase = await createClient();
+    const today = format(new Date(), "yyyy-MM-dd");
 
     // Parallel fetch for dashboard data
     const [
         recommendation,
         projectsResult,
         financialResult,
-        personalTasksResult
+        personalTasksResult,
+        dailyPlanResult,
+        delegationResult,
+        projectContextResult,
     ] = await Promise.all([
         generateRecommendation(),
         supabase.from("projects")
@@ -34,12 +39,43 @@ export default async function CockpitPage() {
             .is("project_id", null)
             .neq("status", "Done")
             .order("due_date", { ascending: true })
-            .limit(5)
+            .limit(5),
+        // Today's daily plan with time_blocks
+        supabase.from("daily_plans")
+            .select("*")
+            .eq("plan_date", today)
+            .maybeSingle(),
+        // Recent delegation activity
+        (supabase.from("delegation_log" as any) as any)
+            .select("*, tasks(title, project_id)")
+            .order("delegated_at", { ascending: false })
+            .limit(8),
+        // Project state contexts (for cards)
+        (supabase.from("project_state_context" as any) as any)
+            .select("*")
+            .order("updated_at", { ascending: false })
+            .limit(6),
     ]);
 
     const activeProjects = projectsResult.data || [];
     const outstanding = financialResult.data?.reduce((acc, curr) => acc + (curr.amount || 0), 0) || 0;
     const personalTasks = personalTasksResult.data || [];
+    const dailyPlan = dailyPlanResult.data as any;
+    const delegations = (delegationResult.data || []) as any[];
+    const projectContexts = (projectContextResult.data || []) as any[];
+
+    // Parse time_blocks from daily plan
+    const timeBlocks: { start: string; end: string; label: string; color?: string }[] = (() => {
+        if (!dailyPlan?.time_blocks) return [];
+        try {
+            const blocks = typeof dailyPlan.time_blocks === "string"
+                ? JSON.parse(dailyPlan.time_blocks) : dailyPlan.time_blocks;
+            return Array.isArray(blocks) ? blocks : [];
+        } catch { return []; }
+    })();
+
+    // Map project contexts to project names
+    const projectMap = new Map(activeProjects.map(p => [p.id, p.name]));
 
     return (
         <div className="container mx-auto max-w-5xl py-8 space-y-8 px-4">
@@ -72,6 +108,27 @@ export default async function CockpitPage() {
                 </div>
             </div>
 
+            {/* Daily Plan Time Blocks */}
+            {timeBlocks.length > 0 && (
+                <div className="bg-card border border-border rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Calendar className="w-4 h-4" /> Today&apos;s Time Blocks
+                        </h2>
+                        <Link href="/plan" className="text-xs text-primary hover:underline">Edit Plan</Link>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                        {timeBlocks.map((block, i) => (
+                            <div key={i} className="flex-shrink-0 rounded-lg border border-border bg-muted/20 px-4 py-3 min-w-[140px]"
+                                 style={{ borderLeftColor: block.color || "hsl(var(--primary))", borderLeftWidth: "3px" }}>
+                                <div className="text-[10px] font-mono text-muted-foreground">{block.start} – {block.end}</div>
+                                <div className="text-sm font-medium text-foreground mt-0.5 truncate">{block.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Active Projects Grid */}
             <div>
                 <div className="flex items-center justify-between mb-4">
@@ -82,7 +139,9 @@ export default async function CockpitPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {activeProjects.map((project) => (
+                    {activeProjects.map((project) => {
+                        const ctx = projectContexts.find((c: any) => c.project_id === project.id);
+                        return (
                         <Link key={project.id} href={`/projects/${project.id}`} className="group block h-full">
                             <div className="h-full bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors flex flex-col">
                                 <div className="flex items-start justify-between mb-3">
@@ -98,11 +157,20 @@ export default async function CockpitPage() {
                                     {project.description || "No description provided."}
                                 </p>
 
+                                {/* Project State Context card */}
+                                {ctx && ctx.next_action && (
+                                    <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/5 border border-primary/10 text-primary mb-2">
+                                        <LayoutGrid className="w-3 h-3 mt-0.5 shrink-0" />
+                                        <span className="text-[10px] font-medium line-clamp-1 leading-relaxed">
+                                            Next: {ctx.next_action}
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Resume Snippet: show most recent session note */}
                                 {(() => {
                                   const sessions = (project as any).focus_sessions;
                                   if (!sessions || sessions.length === 0) return null;
-                                  // Sort by ended_at desc to find most recent
                                   const sorted = [...sessions].sort((a: any, b: any) =>
                                     new Date(b.ended_at || 0).getTime() - new Date(a.ended_at || 0).getTime()
                                   );
@@ -124,7 +192,7 @@ export default async function CockpitPage() {
                                 </div>
                             </div>
                         </Link>
-                    ))}
+                    )})}
                     {activeProjects.length === 0 && (
                         <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border">
                             No active projects found.
@@ -144,7 +212,6 @@ export default async function CockpitPage() {
                              </div>
                              <div className="text-xs text-muted-foreground mt-1">Outstanding Invoices</div>
                          </div>
-                         {/* Existing logic might add revenue query here */}
                     </div>
                 </div>
 
@@ -175,6 +242,17 @@ export default async function CockpitPage() {
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* Agent Activity Feed */}
+            <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <Bot className="w-4 h-4" /> Agent Activity
+                    </h2>
+                    <Link href="/terminal" className="text-xs text-primary hover:underline">Terminal →</Link>
+                </div>
+                <AgentFeed limit={8} initialData={delegations} />
             </div>
         </div>
     );

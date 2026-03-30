@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Moon, Inbox, Plus, ArrowLeft, Zap, CalendarCheck, ListTodo, CalendarDays, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { NotificationCenter } from "@/components/features/notifications/NotificationCenter";
 
 interface ContextBarProps {
   mode: 'cockpit' | 'focus' | 'plan';
@@ -90,6 +91,9 @@ export function ContextBar({
                         </Link>
                     </>
                 )}
+
+                {/* Notification Center */}
+                <NotificationCenter />
 
                 {/* Inbox */}
                 <div className="relative">

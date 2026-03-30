@@ -3,10 +3,12 @@
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Project, Task, ProjectAsset, MeetingMinutes, Invoice, Sprint, Milestone } from "@/types/database";
+import type { ProjectStateContext as PSCType } from "@/types/database";
 import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import type { AuthorityApplication } from "@/lib/actions/authority-applications";
 import type { TaskDependency } from "@/lib/actions/task-dependencies";
 import { TaskDetailSheet } from "@/components/features/tasks/TaskDetailSheet";
+import { ProjectStateContext as ProjectStateContextWidget } from "@/components/features/projects/ProjectStateContext";
 import { ScopeTree } from "@/components/features/scope/ScopeTree";
 import { ContextDrawer } from "@/components/features/context-drawer/ContextDrawer";
 import { GanttView } from "@/components/features/gantt/GanttView";
@@ -57,11 +59,13 @@ interface ProjectCanvasProps {
   authorityApplications: AuthorityApplication[];
   resumeNote: string | null;
   taskDependencies: TaskDependency[];
+  projectStateContext: PSCType | null;
 }
 
 export function ProjectCanvas({
   project, tasks, assets, minutes, invoices, sprints,
   milestones, scopeNodes, authorityApplications, resumeNote, taskDependencies,
+  projectStateContext,
 }: ProjectCanvasProps) {
   const router = useRouter();
 
@@ -190,6 +194,23 @@ export function ProjectCanvas({
         priority: "Medium",
         start_date: new Date().toISOString(),
         due_date: new Date(Date.now() + 86400000).toISOString(),
+      } as any);
+      if (newTask) {
+        setSelectedTask(newTask as Task);
+        router.refresh();
+      }
+    });
+  };
+
+  const handleCreateTask = (sprintId: string | null) => {
+    startTransition(async () => {
+      const { createTask } = await import("@/lib/actions/tasks");
+      const newTask = await createTask({
+        title: "New Task",
+        project_id: project.id,
+        status: "Todo",
+        priority: "Medium",
+        ...(sprintId ? { sprint_id: sprintId } : {}),
       } as any);
       if (newTask) {
         setSelectedTask(newTask as Task);
@@ -367,6 +388,7 @@ export function ProjectCanvas({
                 onTaskClick={setSelectedTask}
                 lockedTaskIds={lockedTaskIds}
                 scopeNodes={scopeNodes}
+                onCreateTask={handleCreateTask}
               />
             )}
 
@@ -394,15 +416,24 @@ export function ProjectCanvas({
           "shrink-0 overflow-hidden transition-all duration-300 border-l border-border",
           col3Open ? "w-96" : "w-0 border-l-0"
         )}>
-          <ContextDrawer
-            projectId={project.id}
-            projectBudget={(project as any).budget ?? 0}
-            assets={assets}
-            invoices={invoices}
-            milestones={milestones}
-            authorityApplications={authorityApplications}
-            scopeNodes={scopeNodes}
-          />
+          <div className="overflow-y-auto h-full">
+            {/* Project State Context widget */}
+            <div className="p-3 border-b border-border">
+              <ProjectStateContextWidget
+                context={projectStateContext}
+                projectId={project.id}
+              />
+            </div>
+            <ContextDrawer
+              projectId={project.id}
+              projectBudget={(project as any).budget ?? 0}
+              assets={assets}
+              invoices={invoices}
+              milestones={milestones}
+              authorityApplications={authorityApplications}
+              scopeNodes={scopeNodes}
+            />
+          </div>
         </aside>
       </div>
 

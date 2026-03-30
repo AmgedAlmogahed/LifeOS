@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { ProjectCanvas } from "./project-forge";
-import type { Project, Sprint, Milestone } from "@/types/database";
+import type { Project, Sprint, Milestone, ProjectStateContext } from "@/types/database";
 import { ScopeNode } from "@/lib/actions/scope-nodes";
 import { AuthorityApplication } from "@/lib/actions/authority-applications";
 import { TaskDependency } from "@/lib/actions/task-dependencies";
@@ -35,6 +35,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     authorityApplicationsRes,
     lastSessionRes,
     dependenciesRes,
+    stateContextRes,
   ] = await Promise.all([
     supabase.from("tasks").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("project_assets").select("*").eq("project_id", id).order("created_at", { ascending: false }),
@@ -58,6 +59,11 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       .from("task_dependencies" as any)
       .select("id, task_id, depends_on_task_id, created_at")
       .order("created_at", { ascending: true }),
+    // Fetch project state context
+    (supabase.from("project_state_context" as any) as any)
+      .select("*")
+      .eq("project_id", id)
+      .maybeSingle(),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +82,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       authorityApplications={(authorityApplicationsRes.data as unknown as AuthorityApplication[]) ?? []}
       resumeNote={resumeNote}
       taskDependencies={(dependenciesRes.data as unknown as TaskDependency[]) ?? []}
+      projectStateContext={(stateContextRes.data as ProjectStateContext | null) ?? null}
     />
   );
 }

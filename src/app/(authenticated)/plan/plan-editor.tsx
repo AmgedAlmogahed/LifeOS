@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { DailyPlan, Project, QuickCapture, Task } from "@/types/database";
 import { updateDailyPlan, completeDailyPlan } from "@/lib/actions/daily-plans";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Check, Loader2, Save, Moon, BookOpen, MessageSquareText } from "lucide-react";
+import { Check, Loader2, Save, Moon, Sun, BookOpen, MessageSquareText, CalendarClock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { TodayReview } from "@/components/features/plan/TodayReview";
 import { AIRecommendation } from "@/components/features/plan/AIRecommendation";
 import { CaptureTriage } from "@/components/features/plan/CaptureTriage";
 import { TaskCommitment } from "@/components/features/plan/TaskCommitment";
+import { TimeBlockEditor } from "@/components/features/plan/TimeBlockEditor";
+import { cn } from "@/lib/utils";
 
 interface PlanEditorProps {
     initialPlan: DailyPlan;
@@ -33,6 +35,28 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
     const [reflection, setReflection] = useState(plan.reflection_notes || "");
     const [closingNotes, setClosingNotes] = useState(plan.plan_notes || "");
     const [isSaving, setIsSaving] = useState(false);
+
+    // Morning / Evening mode
+    const currentHour = new Date().getHours();
+    const [mode, setMode] = useState<"morning" | "evening">(currentHour < 15 ? "morning" : "evening");
+
+    // Parse time_blocks from plan
+    const initialTimeBlocks = useMemo(() => {
+        const raw = (plan as any).time_blocks;
+        if (!raw) return [];
+        try {
+            const blocks = typeof raw === "string" ? JSON.parse(raw) : raw;
+            if (!Array.isArray(blocks)) return [];
+            return blocks.map((b: any, i: number) => ({
+                id: b.id || Math.random().toString(36).slice(2, 9),
+                start: b.start || "09:00",
+                end: b.end || "10:00",
+                label: b.label || b.type || "",
+                color: b.color || "#6366f1",
+                taskId: b.task_id || undefined,
+            }));
+        } catch { return []; }
+    }, [plan]);
 
     async function handleSave() {
         setIsSaving(true);
@@ -61,6 +85,32 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
 
     return (
         <div className="space-y-12 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => setMode("morning")}
+                    className={cn(
+                        "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        mode === "morning"
+                            ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                            : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    <Sun className="w-4 h-4" /> Morning Plan
+                </button>
+                <button
+                    onClick={() => setMode("evening")}
+                    className={cn(
+                        "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                        mode === "evening"
+                            ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                            : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    <Moon className="w-4 h-4" /> Evening Reflect
+                </button>
+            </div>
             {/* Phase 1: Review */}
             <div className="space-y-8">
                 <TodayReview stats={stats} />
@@ -107,6 +157,36 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
             <TaskCommitment projects={projects} />
 
             <Separator className="opacity-50" />
+
+            {/* Phase 4.5: Time Block Editor */}
+            <section className="space-y-4">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <CalendarClock className="w-5 h-5 text-cyan-500" />
+                    {mode === "morning" ? "Plan Tomorrow's Time Blocks" : "Review & Adjust Time Blocks"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                    {mode === "morning"
+                        ? "Set your time blocks for the day ahead. Blocks auto-save when you hit 'Save Blocks'."
+                        : "Review how today's blocks went. Adjust for tomorrow if needed."
+                    }
+                </p>
+                <TimeBlockEditor
+                    initialBlocks={initialTimeBlocks}
+                    onSave={async (blocks) => {
+                        const dbBlocks = blocks.map(b => ({
+                            start: b.start,
+                            end: b.end,
+                            task_id: b.taskId || null,
+                            type: b.label || "focus",
+                            label: b.label,
+                            color: b.color,
+                            id: b.id,
+                        }));
+                        await updateDailyPlan(plan.id, { time_blocks: dbBlocks } as any);
+                        toast.success("Time blocks saved");
+                    }}
+                />
+            </section>
 
             {/* Phase 5: Closing */}
             <section className="space-y-4">
