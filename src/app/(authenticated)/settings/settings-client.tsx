@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Settings, Building2, Lock, Shield, BookOpen, Palette } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Settings, Building2, Lock, Shield, BookOpen, Palette, ChevronDown, ChevronRight, Save, Loader2 } from "lucide-react";
+import { updateAccountProfile } from "@/lib/actions/accounts";
 
 type Tab = "companies" | "vault" | "rules" | "catalog" | "preferences";
 
@@ -12,6 +13,122 @@ const tabs: { key: Tab; label: string; icon: typeof Building2 }[] = [
   { key: "catalog", label: "Service Catalog", icon: BookOpen },
   { key: "preferences", label: "Preferences", icon: Palette },
 ];
+
+function CompanyForm({ account }: { account: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    startTransition(async () => {
+      await updateAccountProfile(account.id, form);
+      // Optional: show toast here
+    });
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-4 p-4 hover:bg-accent/30 transition-colors text-left"
+      >
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+          {account.logo_url ? (
+            <img src={account.logo_url} alt="Logo" className="w-full h-full object-cover rounded-lg" />
+          ) : (
+            account.name?.charAt(0) ?? "?"
+          )}
+        </div>
+        <div className="flex-1">
+          <h4 className="text-sm font-semibold text-foreground">{account.name}</h4>
+          <span className="text-[10px] text-muted-foreground/60">{account.legal_name || "No legal name set"}</span>
+        </div>
+        <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${account.is_active !== false ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"} mr-4`}>
+          {account.is_active !== false ? "Active" : "Inactive"}
+        </span>
+        {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {isOpen && (
+        <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-accent/5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Legal Name</label>
+              <input name="legal_name" defaultValue={account.legal_name || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border focus:ring-1 focus:ring-primary outline-none" placeholder="Official Company Name LLC" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</label>
+              <select name="is_active" defaultValue={account.is_active !== false ? "true" : "false"} className="w-full text-xs p-2 rounded-md bg-background border border-border focus:ring-1 focus:ring-primary outline-none">
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">CR Number</label>
+              <input name="cr_number" defaultValue={account.cr_number || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="Commercial Registration" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">VAT Number</label>
+              <input name="vat_number" defaultValue={account.vat_number || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="Tax Registration Number" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Bank Name</label>
+              <input name="bank_name" defaultValue={account.bank_name || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="e.g. Al Rajhi" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">IBAN</label>
+              <input name="bank_iban" defaultValue={account.bank_iban || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="SA..." />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Account Name</label>
+              <input name="bank_account_name" defaultValue={account.bank_account_name || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="Official AC Name" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Email</label>
+              <input type="email" name="email" defaultValue={account.email || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="info@company.com" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Phone</label>
+              <input name="phone" defaultValue={account.phone || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="+966 ..." />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Website</label>
+              <input name="website" defaultValue={account.website || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="https://" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Logo URL</label>
+              <input name="logo_url" defaultValue={account.logo_url || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="https://..." />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Letterhead PDF URL</label>
+              <input name="letterhead_url" defaultValue={account.letterhead_url || ""} className="w-full text-xs p-2 rounded-md bg-background border border-border" placeholder="https://..." />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button type="submit" disabled={pending} className="btn-gradient px-4 py-2 text-xs flex items-center gap-2">
+              {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Save Profile
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 export function SettingsClient({
   accounts,
@@ -62,18 +179,7 @@ export function SettingsClient({
             ) : (
               <div className="space-y-3">
                 {accounts.map((acc) => (
-                  <div key={acc.id} className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                      {acc.name?.charAt(0) ?? "?"}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-foreground">{acc.name}</h4>
-                      <span className="text-[10px] text-muted-foreground/60">{acc.legal_name || "No legal name set"}</span>
-                    </div>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${acc.is_active !== false ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
-                      {acc.is_active !== false ? "Active" : "Inactive"}
-                    </span>
-                  </div>
+                  <CompanyForm key={acc.id} account={acc} />
                 ))}
               </div>
             )}

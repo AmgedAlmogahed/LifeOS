@@ -1,21 +1,28 @@
 import { createClient } from "@/lib/supabase/server";
 import { QuotesClient } from "./quotes-client";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export const metadata = { title: "Quotations | Venture OS" };
 
 export default async function QuotesPage() {
-  const supabase = await createClient();
-  const [offersRes, clientsRes, oppsRes] = await Promise.all([
-    supabase.from("price_offers").select("*").order("created_at", { ascending: false }),
-    supabase.from("clients").select("id, name").order("name"),
-    supabase.from("opportunities").select("id, title, client_id").order("updated_at", { ascending: false }),
-  ]);
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) redirect("/auth/login");
+
+  const { data: accounts } = await supabase.from("accounts").select("*").eq("is_active", true);
+
+  let quotes = [];
+  try {
+    const { data: qts, error: err } = await supabase.from("price_offers").select("*, clients(name)").order("created_at", { ascending: false });
+    if (!err && qts) quotes = qts;
+  } catch (err) {
+    console.warn("Could not fetch quotes data, migration possibly unapplied");
+  }
 
   return (
-    <QuotesClient
-      offers={(offersRes.data ?? []) as any[]}
-      clients={(clientsRes.data ?? []) as any[]}
-      opportunities={(oppsRes.data ?? []) as any[]}
+    <QuotesClient 
+      accounts={accounts || []} 
+      quotes={quotes} 
     />
   );
 }

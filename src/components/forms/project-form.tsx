@@ -51,17 +51,29 @@ export function ProjectForm({ open, onClose, clients, accounts }: Props) {
           <Field label="Client" name="client_id">
             <SelectInput name="client_id" options={clients.map((c) => ({ value: c.id, label: c.name }))} />
           </Field>
-          <Field label="Service Type" name="service_type">
-            <SelectInput name="service_type" options={serviceTypes} />
+          <Field label="Framework Category" name="category" required>
+            <SelectInput name="category" options={[
+              { value: "Personal", label: "🧘 Personal / Internal" },
+              { value: "ERP", label: "🏢 ERP / Platform" },
+              { value: "WebApp", label: "💻 Web Application" },
+              { value: "SimpleWebsite", label: "📄 Simple Website" },
+              { value: "MobileApp", label: "📱 Mobile App" },
+              { value: "Marketing", label: "📣 Marketing" },
+              { value: "Branding", label: "🎨 Branding" },
+              { value: "Consulting", label: "🗣️ Consulting" },
+            ]} />
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Account (Domain Entity)" name="account_id">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Account Entity" name="account_id">
             <SelectInput name="account_id" options={accounts.map((a) => ({ value: a.id, label: a.name }))} />
           </Field>
+          <Field label="Service Type" name="service_type">
+            <SelectInput name="service_type" options={serviceTypes} />
+          </Field>
           <Field label="Budget" name="budget">
-            <TextInput name="budget" type="number" placeholder="50000" />
+            <TextInput name="budget" type="number" placeholder="50k" />
           </Field>
         </div>
 

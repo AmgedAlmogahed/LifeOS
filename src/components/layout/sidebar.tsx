@@ -8,7 +8,7 @@ import {
   FolderKanban, CheckSquare, Repeat,
   Receipt, Wallet, FileSignature,
   Bot, Rocket, ScrollText, Settings,
-  X, ChevronRight, ChevronDown, Building2
+  X, ChevronRight, ChevronDown, Building2, Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCompanyFilter, type CompanyFilter } from "@/components/providers/company-filter-context";
@@ -61,6 +61,7 @@ const navGroups = [
       { href: "/agents", label: "Agents", icon: Bot },
       { href: "/deployments", label: "Deployments", icon: Rocket },
       { href: "/logs", label: "Logs", icon: ScrollText },
+      { href: "/settings/templates", label: "Frameworks", icon: Layers },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },

@@ -9,7 +9,9 @@ export async function createProject(formData: FormData) {
     if (!name?.trim()) return { error: "Name is required" };
 
     const budgetStr = formData.get("budget") as string;
-    const { data, error } = await (supabase.from("projects") as any).insert({
+    const category = formData.get("category") as string || "Personal";
+
+    const { data: project, error } = await (supabase.from("projects") as any).insert({
         name: name.trim(),
         description: (formData.get("description") as string) ?? "",
         status: "Understand",
@@ -25,19 +27,68 @@ export async function createProject(formData: FormData) {
 
     if (error) return { error: error.message };
 
-    // Auto-create lifecycle record
-    if (data) {
-        await (supabase.from("lifecycles") as any).insert({
-            project_id: data.id,
-            current_stage: "Requirements",
-            stage_history: [{ stage: "Requirements", entered_at: new Date().toISOString() }],
-            started_at: new Date().toISOString(),
-        });
+    if (project) {
+        // Fetch matching template from DB
+        const { data: template } = await (supabase.from("project_templates") as any).select("*").eq("category", category).single();
+
+        if (!template || !template.phases || template.phases.length === 0) {
+            // Fallback to legacy static insert if no framework matches
+            await (supabase.from("lifecycles") as any).insert({
+                project_id: project.id,
+                current_stage: "Requirements",
+                stage_history: [{ stage: "Requirements", entered_at: new Date().toISOString() }],
+                started_at: new Date().toISOString(),
+            });
+        } else {
+            // Apply the Project Framework Lifecycle
+            const phasesInfo = template.phases.map((p: any) => ({
+                name: p.name,
+                order: p.order,
+                entered_at: null,
+                completed_at: null,
+            }));
+            
+            phasesInfo[0].entered_at = new Date().toISOString();
+
+            await (supabase.from("lifecycles") as any).insert({
+                project_id: project.id,
+                current_stage: phasesInfo[0].name,
+                stage_history: phasesInfo,
+                started_at: new Date().toISOString(),
+            });
+
+            // Generate Tasks across all phases
+            const tasksToInsert: any[] = [];
+            
+            template.phases.forEach((phase: any, index: number) => {
+                const isPhase1 = index === 0;
+                
+                phase.tasks.forEach((taskTpl: any) => {
+                    tasksToInsert.push({
+                        project_id: project.id,
+                        title: taskTpl.title,
+                        type: taskTpl.type,
+                        priority: taskTpl.priority,
+                        energy_level: taskTpl.energy_level,
+                        estimated_minutes: taskTpl.estimated_minutes,
+                        status: 'Todo',
+                        metadata: isPhase1 ? 
+                            { from_template: true, phase: phase.name } : 
+                            { from_template: true, phase: phase.name, backlog: true },
+                    });
+                });
+            });
+
+            if (tasksToInsert.length > 0) {
+                const { error: batchErr } = await (supabase.from("tasks") as any).insert(tasksToInsert);
+                if (batchErr) console.error("Could not batch insert templated tasks:", batchErr.message);
+            }
+        }
     }
 
     revalidatePath("/projects");
     revalidatePath("/dashboard");
-    return { success: true, id: data?.id };
+    return { success: true, id: project?.id };
 }
 
 export async function updateProject(id: string, formData: FormData) {

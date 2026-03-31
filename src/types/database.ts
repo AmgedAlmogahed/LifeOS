@@ -114,6 +114,33 @@ export interface StateSnapshot {
   created_at: string;
 }
 
+export interface ProjectTemplatePhaseTask {
+  title: string;
+  type: TaskType;
+  priority: TaskPriority;
+  energy_level: EnergyLevel;
+  estimated_minutes: number;
+  dev_type?: string;
+  description?: string;
+}
+
+export interface ProjectTemplatePhase {
+  name: string;
+  order: number;
+  tasks: ProjectTemplatePhaseTask[];
+}
+
+export interface ProjectTemplate {
+  id: string;
+  category: ProjectCategory | string;
+  name: string;
+  description: string;
+  phases: ProjectTemplatePhase[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DelegationLogEntry {
   id: string;
   task_id: string;

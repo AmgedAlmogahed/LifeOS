@@ -1,157 +1,105 @@
 "use client";
 
 import { useState } from "react";
-import type { Client, PriceOffer, Opportunity } from "@/types/database";
-import { FileText, DollarSign, Plus } from "lucide-react";
-import { PriceOfferForm } from "@/components/forms/price-offer-form";
+import { FileText, Plus, Search, CheckCircle, Download, Clock } from "lucide-react";
 
-const currency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v);
+function currency(v: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v); }
 
-const offerStatusCls: Record<string, string> = {
-  Draft: "stage-draft stage-bg-draft",
-  Sent: "stage-sent stage-bg-sent",
-  Accepted: "stage-won stage-bg-won",
-  Rejected: "stage-lost stage-bg-lost",
-  Expired: "text-muted-foreground bg-accent/30",
-};
+export function QuotesClient({ quotes = [], accounts = [] }: { quotes: any[], accounts: any[] }) {
+  const [searchQuery, setSearchQuery] = useState("");
 
-export function QuotesClient({
-  offers,
-  clients,
-  opportunities,
-}: {
-  offers: PriceOffer[];
-  clients: Client[];
-  opportunities: Opportunity[];
-}) {
-  const [showForm, setShowForm] = useState(false);
-  const [editOffer, setEditOffer] = useState<PriceOffer | null>(null);
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]));
-  const totalValue = offers.reduce((s, o) => s + o.total_value, 0);
-
-  const filtered = statusFilter === "all"
-    ? offers
-    : offers.filter((o) => o.status === statusFilter);
+  const filteredQuotes = quotes.filter(q => 
+    q.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    q.clients?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="h-14 border-b border-border flex items-center px-6 bg-card/40 backdrop-blur-sm shrink-0 gap-4">
-        <FileText className="w-4 h-4 text-primary" />
-        <span className="text-sm font-bold text-foreground">Quotes</span>
-        <span className="text-xs text-muted-foreground">Price Offers & Proposals</span>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => { setEditOffer(null); setShowForm(true); }}
-            className="btn-gradient px-3 py-1.5 text-xs flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" /> New Quote
+    <div className="flex flex-col h-full bg-background">
+      <div className="h-16 border-b border-border flex items-center px-6 bg-card/40 backdrop-blur-sm shrink-0 gap-4">
+        <FileText className="w-5 h-5 text-indigo-500" />
+        <div>
+           <h1 className="text-sm font-bold text-foreground leading-tight">Quotation Engine</h1>
+           <span className="text-[10px] text-muted-foreground">{quotes.length} price offers tracked</span>
+        </div>
+        
+        <div className="ml-auto flex items-center gap-4">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="Search by client or title..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-1.5 h-8 bg-accent/20 border border-border/50 rounded-lg text-xs w-64 focus:outline-none focus:border-indigo-500/50" 
+            />
+          </div>
+          <button className="btn-gradient bg-indigo-500 hover:bg-indigo-600 px-4 py-1.5 text-xs flex items-center gap-1.5 shadow-sm">
+            <Plus className="w-3.5 h-3.5" /> Build Quote
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5 fade-in">
-        {/* KPIs */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="glass-card kpi-card p-4" style={{ "--kpi-accent": "var(--color-gold)" } as React.CSSProperties}>
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-5 h-5" style={{ color: "oklch(0.78 0.14 80)" }} />
-              <span className="text-[11px] text-muted-foreground">Total Quoted</span>
-            </div>
-            <div className="text-2xl font-bold text-foreground">{currency(totalValue)}</div>
-            <div className="text-xs text-muted-foreground/60 mt-1">{offers.length} total quotes</div>
-          </div>
-          <div className="glass-card kpi-card p-4" style={{ "--kpi-accent": "var(--color-revenue)" } as React.CSSProperties}>
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-5 h-5" style={{ color: "oklch(0.72 0.20 155)" }} />
-              <span className="text-[11px] text-muted-foreground">Accepted</span>
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              {currency(offers.filter((o) => o.status === "Accepted").reduce((s, o) => s + o.total_value, 0))}
-            </div>
-            <div className="text-xs text-muted-foreground/60 mt-1">
-              {offers.filter((o) => o.status === "Accepted").length} won
-            </div>
-          </div>
-          <div className="glass-card kpi-card p-4" style={{ "--kpi-accent": "oklch(0.78 0.14 80)" } as React.CSSProperties}>
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-5 h-5 text-amber-500" />
-              <span className="text-[11px] text-muted-foreground">Pending</span>
-            </div>
-            <div className="text-2xl font-bold text-foreground">
-              {currency(offers.filter((o) => ["Draft", "Sent"].includes(o.status)).reduce((s, o) => s + o.total_value, 0))}
-            </div>
-            <div className="text-xs text-muted-foreground/60 mt-1">
-              {offers.filter((o) => ["Draft", "Sent"].includes(o.status)).length} open
-            </div>
-          </div>
-        </div>
-
-        {/* Filter */}
-        <div className="flex gap-1 p-0.5 bg-accent/30 rounded-lg w-fit">
-          {["all", "Draft", "Sent", "Accepted", "Rejected", "Expired"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all capitalize ${
-                statusFilter === s ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {s === "all" ? "All" : s}
-            </button>
-          ))}
-        </div>
-
-        {/* List */}
-        <div className="glass-card p-5">
-          {filtered.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">No quotes found.</p>
-              <button
-                onClick={() => { setEditOffer(null); setShowForm(true); }}
-                className="btn-gradient px-4 py-2 text-xs mt-3 inline-flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" /> Create your first quote
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map((offer) => (
-                <div
-                  key={offer.id}
-                  onClick={() => { setEditOffer(offer); setShowForm(true); }}
-                  className="flex items-center gap-4 py-3 px-3 rounded-lg hover:bg-accent/15 cursor-pointer transition-colors"
-                >
-                  <DollarSign className="w-4 h-4 shrink-0" style={{ color: "oklch(0.78 0.14 80)" }} />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-foreground truncate">{offer.title}</h4>
-                    <span className="text-[10px] text-muted-foreground/50">
-                      {clientMap[offer.client_id] ?? "Unknown"}
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold gradient-text-gold">{currency(offer.total_value)}</span>
-                  <span
-                    className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${offerStatusCls[offer.status] ?? ""}`}
-                  >
-                    {offer.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="flex-1 overflow-y-auto p-6 fade-in max-w-6xl mx-auto w-full">
+         <div className="glass-card">
+            {filteredQuotes.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground opacity-50">
+                  <FileText className="w-12 h-12 mb-4 text-indigo-500/50" />
+                  <span className="text-sm font-bold text-foreground">No Quotations Yet</span>
+                  <span className="text-xs max-w-xs mt-1">Start drafting proposals to pitch your services. They will securely save here.</span>
+               </div>
+            ) : (
+               <table className="w-full text-left border-collapse">
+                 <thead>
+                   <tr className="bg-accent/10 border-b border-border text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                     <th className="p-4">Title & Description</th>
+                     <th className="p-4">Client</th>
+                     <th className="p-4">Total Value</th>
+                     <th className="p-4">Status</th>
+                     <th className="p-4 text-right">Actions</th>
+                   </tr>
+                 </thead>
+                 <tbody className="text-xs">
+                    {filteredQuotes.map(q => (
+                       <tr key={q.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors group cursor-pointer">
+                          <td className="p-4">
+                             <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{q.title}</div>
+                             <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] truncate">{q.notes || 'No description provided.'}</div>
+                          </td>
+                          <td className="p-4 font-medium text-muted-foreground">{q.clients?.name || '—'}</td>
+                          <td className="p-4">
+                             <div className="font-bold text-foreground">{currency(q.total_value)}</div>
+                             {q.vat_type && q.vat_type !== 'None' && <div className="text-[9px] text-muted-foreground">Incl. {q.vat_type} VAT</div>}
+                          </td>
+                          <td className="p-4">
+                             <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
+                               q.status === 'Accepted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
+                               q.status === 'Sent' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                               q.status === 'Rejected' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                               'bg-accent text-muted-foreground border-border/50'
+                             }`}>
+                               {q.status}
+                             </span>
+                          </td>
+                          <td className="p-4 text-right">
+                             <div className="flex flex-col items-end gap-2">
+                               {q.pdf_url ? (
+                                  <a href={q.pdf_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[10px] font-semibold text-primary hover:underline">
+                                    <Download className="w-3 h-3" /> View PDF
+                                  </a>
+                               ) : (
+                                  <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+                                    <Clock className="w-3 h-3" /> No PDF
+                                  </span>
+                               )}
+                             </div>
+                          </td>
+                       </tr>
+                    ))}
+                 </tbody>
+               </table>
+            )}
+         </div>
       </div>
-
-      <PriceOfferForm
-        open={showForm}
-        onClose={() => { setShowForm(false); setEditOffer(null); }}
-        clients={clients}
-        opportunities={opportunities}
-        editOffer={editOffer}
-      />
     </div>
   );
 }

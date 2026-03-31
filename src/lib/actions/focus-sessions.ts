@@ -45,6 +45,70 @@ export async function endFocusSession(sessionId: string, notes: string | null) {
     revalidatePath("/cockpit");
 }
 
+export async function endFocusSessionEnhanced(
+    sessionId: string, 
+    projectId: string,
+    data: {
+        taskId: string;
+        taskStatus: string;
+        accomplished: string;
+        blockers?: string;
+        nextStep?: string;
+    }
+) {
+    const supabase = await createClient();
+    
+    // 1. End session
+    await supabase.from("focus_sessions").update({
+        ended_at: new Date().toISOString(),
+        session_notes: data.accomplished
+    }).eq("id", sessionId);
+
+    // 2. Update task status (if Done, set completed_at)
+    const taskUpdates: any = { status: data.taskStatus };
+    if (data.taskStatus === "Done") {
+        taskUpdates.completed_at = new Date().toISOString();
+    }
+    await supabase.from("tasks").update(taskUpdates).eq("id", data.taskId);
+
+    // 3. Create state snapshot
+    const snapshotText = `[Focus Session Debrief]\nTask: ${data.taskId}\nAccomplished: ${data.accomplished}\nBlockers: ${data.blockers || 'None'}\nNext: ${data.nextStep || 'None'}`;
+    await (supabase.from("state_snapshots" as any) as any).insert({
+        project_id: projectId,
+        trigger: "focus_exit",
+        snapshot_text: snapshotText
+    });
+
+    // 4. Update Project State Context (Upsert)
+    // First try to fetch it
+    const { data: existingContext } = await (supabase.from("project_state_context" as any) as any)
+        .select("id")
+        .eq("project_id", projectId)
+        .maybeSingle();
+
+    if (existingContext) {
+        await (supabase.from("project_state_context" as any) as any).update({
+            context_summary: data.accomplished,
+            current_blockers: data.blockers ? [data.blockers] : [],
+            next_action: data.nextStep || null,
+            updated_at: new Date().toISOString()
+        }).eq("id", existingContext.id);
+    } else {
+        await (supabase.from("project_state_context" as any) as any).insert({
+            project_id: projectId,
+            context_summary: data.accomplished,
+            current_blockers: data.blockers ? [data.blockers] : [],
+            last_decision: "Session Ended",
+            next_action: data.nextStep || null,
+            updated_at: new Date().toISOString()
+        });
+    }
+
+    revalidatePath("/cockpit");
+    revalidatePath(`/focus/${projectId}`);
+    return { success: true };
+}
+
 /**
  * Close any sessions that were left open from a previous day.
  * This handles the case where a user closes the browser without ending their session.
