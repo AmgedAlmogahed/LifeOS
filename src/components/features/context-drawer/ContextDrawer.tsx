@@ -7,10 +7,11 @@ import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import { AssetsTab } from "./AssetsTab";
 import { FinanceTab } from "./FinanceTab";
 import { AuthorityTab } from "./AuthorityTab";
-import { FolderOpen, DollarSign, Shield } from "lucide-react";
+import { DocumentsTab } from "./DocumentsTab";
+import { FolderOpen, DollarSign, Shield, FileStack } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type DrawerTab = "assets" | "finance" | "authority";
+type DrawerTab = "assets" | "documents" | "finance" | "authority";
 
 interface ContextDrawerProps {
   projectId: string;
@@ -20,17 +21,21 @@ interface ContextDrawerProps {
   milestones: Milestone[];
   authorityApplications: AuthorityApplication[];
   scopeNodes: ScopeNode[];
+  isPersonal?: boolean;
+  documents: any[];
+  contextBundle: any;
 }
 
 export function ContextDrawer({
-  projectId, projectBudget, assets, invoices, milestones, authorityApplications, scopeNodes,
+  projectId, projectBudget, assets, invoices, milestones, authorityApplications, scopeNodes, isPersonal, documents, contextBundle
 }: ContextDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("assets");
 
-  const tabs: { id: DrawerTab; label: string; icon: React.ReactNode; count?: number }[] = [
-    { id: "assets",    label: "Assets",    icon: <FolderOpen className="w-3.5 h-3.5" />, count: assets.length },
-    { id: "finance",   label: "Finance",   icon: <DollarSign className="w-3.5 h-3.5" />, count: invoices.length },
-    { id: "authority", label: "Authority", icon: <Shield className="w-3.5 h-3.5" />, count: authorityApplications.length },
+  const tabs = [
+    { id: "assets" as DrawerTab,    label: "Assets",    icon: <FolderOpen className="w-3.5 h-3.5" />, count: assets.length },
+    { id: "documents" as DrawerTab, label: "Docs",      icon: <FileStack className="w-3.5 h-3.5" />, count: documents.length },
+    ...(!isPersonal ? [{ id: "finance" as DrawerTab,   label: "Finance",   icon: <DollarSign className="w-3.5 h-3.5" />, count: invoices.length }] : []),
+    { id: "authority" as DrawerTab, label: "Authority", icon: <Shield className="w-3.5 h-3.5" />, count: authorityApplications.length },
   ];
 
   return (
@@ -63,6 +68,13 @@ export function ContextDrawer({
       <div className="flex-1 overflow-y-auto">
         {activeTab === "assets" && (
           <AssetsTab projectId={projectId} assets={assets} />
+        )}
+        {activeTab === "documents" && (
+          <DocumentsTab 
+            projectId={projectId} 
+            documents={documents} 
+            contextBundle={contextBundle} 
+          />
         )}
         {activeTab === "finance" && (
           <FinanceTab

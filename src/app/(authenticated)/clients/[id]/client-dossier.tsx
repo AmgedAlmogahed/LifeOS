@@ -7,10 +7,16 @@ import type { Client, Opportunity, Contract, Project, AgentReport } from "@/type
 import {
   ArrowLeft, Heart, FileText, FolderKanban, TrendingUp,
   Bot, ExternalLink, Globe, Palette, Upload, Loader2,
-  Clock, DollarSign, FileStack, BookOpen, Activity
+  Clock, DollarSign, FileStack, BookOpen, Activity, BrainCircuit
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { uploadFile } from "@/lib/storage";
 import { updateClientLogo } from "@/lib/actions/assets";
+import { DocumentList } from "@/components/features/documents/DocumentList";
+import { DocumentUploadModal } from "@/components/features/documents/DocumentUploadModal";
+import { ContextBundlePreview } from "@/components/features/documents/ContextBundlePreview";
+import { deleteDocument, markContextStale } from "@/lib/actions/documents";
+import { BackButton } from "@/components/ui/back-button";
 
 import { ClientHealthCard } from "@/components/features/clients/ClientHealthCard";
 import { CommunicationTimeline } from "./communication-timeline";
@@ -37,14 +43,24 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function ClientDossier({
-  client, opportunities, contracts, projects, agentReports,
+  client, opportunities, contracts, projects, agentReports, invoices, communicationLogs, documents, contextBundle
 }: {
-  client: Client; opportunities: Opportunity[]; contracts: Contract[]; projects: Project[]; agentReports: AgentReport[];
+  client: Client; 
+  opportunities: Opportunity[]; 
+  contracts: Contract[]; 
+  projects: Project[]; 
+  agentReports: AgentReport[];
+  invoices: any[];
+  communicationLogs: any[];
+  documents: any[];
+  contextBundle: any;
 }) {
   const router = useRouter();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("profile");
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isContextPreviewOpen, setIsContextPreviewOpen] = useState(false);
 
   const activeContracts = contracts.filter((c) => c.status === "Active");
   const totalRevenue = activeContracts.reduce((s, c) => s + Number(c.total_value), 0);
@@ -79,9 +95,7 @@ export function ClientDossier({
         borderColor: `${client.brand_primary}20`,
         background: `linear-gradient(90deg, ${client.brand_primary}08, transparent)`,
       }}>
-        <Link href="/clients" className="mr-4 p-2 hover:bg-accent rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-        </Link>
+        <BackButton fallbackHref="/clients" variant="ghost" size="icon" label="" className="h-10 w-10 mr-4 rounded-xl" />
         
         {/* LOGO */}
         <div className="relative group mr-4">
@@ -208,8 +222,17 @@ export function ClientDossier({
         {activeTab === "timeline" && (
           <div className="max-w-3xl mx-auto animate-in fade-in duration-200">
              <div className="glass-card p-6">
-                {/* Mock timeline implementation for now, connects to backend Phase 2 later */}
-                <CommunicationTimeline logs={[]} />
+                <CommunicationTimeline 
+                  logs={communicationLogs.map(log => ({
+                    id: log.id,
+                    type: log.type || 'NOTE',
+                    timestamp: log.logged_at || log.created_at,
+                    summary: log.summary || log.content,
+                    sentiment: log.sentiment || 'Neutral',
+                    next_step: log.next_step,
+                    follow_up_date: log.follow_up_date
+                  }))} 
+                />
              </div>
           </div>
         )}
@@ -313,22 +336,128 @@ export function ClientDossier({
                 )}
              </div>
 
-             <div className="glass-card p-6">
-                <h2 className="text-sm font-semibold mb-4 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-500"/> Invoice Ledger</h2>
-                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground opacity-50 bg-accent/20 rounded-xl border border-dashed border-border">
-                   <DollarSign className="w-8 h-8 mb-2" />
-                   <span className="text-xs">Invoice generation is handled in Phase 3.</span>
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-500"/> Invoice Ledger</h2>
+                  <button className="text-[10px] btn-gradient px-3 py-1">New Invoice</button>
                 </div>
+                {invoices.length === 0 ? (
+                  <div className="py-8 text-center border border-dashed border-border rounded-lg text-xs text-muted-foreground">No invoices found.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {invoices.map((inv) => (
+                      <div key={inv.id} className="p-3 bg-background border border-border rounded-lg flex items-center gap-3 hover:border-primary/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-foreground truncate">{inv.invoice_number || 'INV-001'}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">Due {new Date(inv.due_date).toLocaleDateString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-bold">{currency(Number(inv.amount))}</div>
+                          <span className={`text-[9px] uppercase tracking-wider font-bold ${
+                            inv.status === 'Paid' ? 'text-emerald-500' : 
+                            inv.status === 'Sent' ? 'text-amber-500' : 'text-muted-foreground'
+                          }`}>{inv.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
              </div>
           </div>
         )}
 
         {/* DOCUMENTS TAB */}
         {activeTab === "documents" && (
-          <div className="glass-card p-6 min-h-[400px] flex flex-col items-center justify-center text-muted-foreground animate-in fade-in">
-             <FileStack className="w-12 h-12 mb-4 opacity-50 text-indigo-500" />
-             <h3 className="text-sm font-semibold text-foreground mb-1">Document Vault</h3>
-             <p className="text-xs text-center max-w-sm leading-relaxed">Securely store proposals, NDAs, architectural blueprints, and other assets. (Coming soon)</p>
+          <div className="space-y-6 animate-in fade-in max-w-5xl mx-auto">
+             <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                        <FileStack className="w-5 h-5 text-indigo-500" /> 
+                        Document Vault
+                    </h2>
+                    <p className="text-xs text-muted-foreground">Manage client contracts, requirements, and AI context.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => setIsContextPreviewOpen(true)}
+                    >
+                        <Bot className="w-4 h-4" /> Context Bundle
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        className="btn-gradient gap-2"
+                        onClick={() => setIsUploadOpen(true)}
+                    >
+                        <Upload className="w-4 h-4" /> Upload
+                    </Button>
+                </div>
+             </div>
+
+             <div className="glass-card p-6">
+                <DocumentList 
+                    documents={documents} 
+                    onDelete={async (id) => {
+                        if (confirm("Are you sure you want to delete this document?")) {
+                            await deleteDocument(id);
+                            router.refresh();
+                        }
+                    }}
+                    onToggleContext={async (id, active) => {
+                        // Using any to bypass typed update for now
+                        const { createClient } = await import("@/lib/supabase/client");
+                        const supabase = createClient();
+                        await supabase.from("documents").update({ is_context_active: active } as any).eq("id", id);
+                        router.refresh();
+                    }}
+                />
+             </div>
+
+             {/* Context Summary Footer */}
+             <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <div className="p-2 bg-indigo-500/10 rounded-lg">
+                      <BrainCircuit className="w-5 h-5 text-indigo-500" />
+                   </div>
+                   <div>
+                      <div className="text-sm font-bold text-indigo-900 dark:text-indigo-100">AI Context Engine</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {contextBundle?.is_stale ? (
+                            <span className="text-amber-600 font-medium flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Changes pending. Regenerate bundle for agents.
+                            </span>
+                        ) : (
+                            "Client context is synchronized and active for all agents."
+                        )}
+                      </div>
+                   </div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => setIsContextPreviewOpen(true)} className="text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10">
+                    Preview Bundle <ExternalLink className="w-3 h-3 ml-2" />
+                </Button>
+             </div>
+
+             <DocumentUploadModal 
+                isOpen={isUploadOpen} 
+                onClose={() => {
+                    setIsUploadOpen(false);
+                    router.refresh();
+                }}
+                clientId={client.id}
+                projects={projects.map(p => ({ id: p.id, name: p.name }))}
+             />
+
+             <ContextBundlePreview 
+                isOpen={isContextPreviewOpen}
+                onClose={() => setIsContextPreviewOpen(false)}
+                type="client"
+                entityId={client.id}
+                entityName={client.name}
+                initialContext={contextBundle?.context_text}
+                isStale={contextBundle?.is_stale}
+             />
           </div>
         )}
 

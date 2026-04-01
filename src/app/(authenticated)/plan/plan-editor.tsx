@@ -111,26 +111,27 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
                     <Moon className="w-4 h-4" /> Evening Reflect
                 </button>
             </div>
-            {/* Phase 1: Review */}
-            <div className="space-y-8">
-                <TodayReview stats={stats} />
-                
-                <section className="space-y-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <BookOpen className="w-5 h-5 text-green-500" />
-                        1. Daily Reflection
-                    </h2>
-                    <p className="text-sm text-muted-foreground">What were your wins today? What did you learn?</p>
-                    <Textarea 
-                        value={reflection}
-                        onChange={(e) => setReflection(e.target.value)}
-                        placeholder="Reflect on your performance and energy..."
-                        className="min-h-[120px] resize-none text-base bg-muted/30 focus:bg-background transition-colors"
-                    />
-                </section>
-            </div>
-
-            <Separator className="opacity-50" />
+            {/* Phase 1: Review (Evening) */}
+            {mode === "evening" && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <TodayReview stats={stats} />
+                    
+                    <section className="space-y-4">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-green-500" />
+                            1. Daily Reflection
+                        </h2>
+                        <p className="text-sm text-muted-foreground">What were your wins today? What did you learn?</p>
+                        <Textarea 
+                            value={reflection}
+                            onChange={(e) => setReflection(e.target.value)}
+                            placeholder="Reflect on your performance and energy..."
+                            className="min-h-[120px] resize-none text-base bg-muted/30 focus:bg-background transition-colors"
+                        />
+                    </section>
+                    <Separator className="opacity-50" />
+                </div>
+            )}
 
             {/* Phase 2: Input Triage */}
             {captures.length > 0 && (
@@ -140,23 +141,29 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
                 </>
             )}
 
-            {/* Phase 3: Alignment */}
-            <AIRecommendation 
-                planId={plan.id} 
-                recommendation={recommendation ? { 
-                    project: recommendation.recommendedProject!, 
-                    reason: recommendation.reason,
-                    score: 0 // Not used in UI but for type safety
-                } : null}
-                currentRecommendationText={plan.ai_recommendation_text}
-            />
+            {/* Phase 3: Alignment (Morning) */}
+            {mode === "morning" && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <AIRecommendation 
+                        planId={plan.id} 
+                        recommendation={recommendation ? { 
+                            project: recommendation.recommendedProject!, 
+                            reason: recommendation.reason,
+                            score: 0 
+                        } : null}
+                        currentRecommendationText={plan.ai_recommendation_text}
+                    />
+                    <Separator className="opacity-50" />
+                </div>
+            )}
 
-            <Separator className="opacity-50" />
-
-            {/* Phase 4: Commitment */}
-            <TaskCommitment projects={projects} />
-
-            <Separator className="opacity-50" />
+            {/* Phase 4: Commitment (Morning) */}
+            {mode === "morning" && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <TaskCommitment projects={projects} />
+                    <Separator className="opacity-50" />
+                </div>
+            )}
 
             {/* Phase 4.5: Time Block Editor */}
             <section className="space-y-4">
@@ -171,6 +178,7 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
                     }
                 </p>
                 <TimeBlockEditor
+                    tasks={projects.flatMap(p => p.tasks).map(t => ({ id: t.id, title: t.title }))}
                     initialBlocks={initialTimeBlocks}
                     onSave={async (blocks) => {
                         const dbBlocks = blocks.map(b => ({
@@ -188,20 +196,22 @@ export function PlanEditor({ initialPlan, recommendation, captures, projects, st
                 />
             </section>
 
-            {/* Phase 5: Closing */}
-            <section className="space-y-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <MessageSquareText className="w-5 h-5 text-purple-500" />
-                     Closing Thoughts
-                </h2>
-                <p className="text-sm text-muted-foreground">Any high-level focus or reminders for tomorrow?</p>
-                <Textarea 
-                    value={closingNotes}
-                    onChange={(e) => setClosingNotes(e.target.value)}
-                    placeholder="Focus for tomorrow is..."
-                    className="min-h-[100px] resize-none text-base bg-muted/30 focus:bg-background transition-colors"
-                />
-            </section>
+            {/* Phase 5: Closing (Evening) */}
+            {mode === "evening" && (
+                <section className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <MessageSquareText className="w-5 h-5 text-purple-500" />
+                         Closing Thoughts
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Any high-level focus or reminders for tomorrow?</p>
+                    <Textarea 
+                        value={closingNotes}
+                        onChange={(e) => setClosingNotes(e.target.value)}
+                        placeholder="Focus for tomorrow is..."
+                        className="min-h-[100px] resize-none text-base bg-muted/30 focus:bg-background transition-colors"
+                    />
+                </section>
+            )}
 
             {/* Footer Actions */}
             <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t p-6 z-50">

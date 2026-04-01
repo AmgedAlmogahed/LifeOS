@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DelegateModal } from "./DelegateModal";
 
 interface TaskDetailSheetProps {
   task: Task | null;
@@ -70,6 +71,7 @@ export function TaskDetailSheet({
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
   const [depSelect, setDepSelect] = useState("");
   const [isLinking, setIsLinking] = useState(false);
+  const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
 
   const router = useRouter();
 
@@ -208,14 +210,7 @@ export function TaskDetailSheet({
   };
 
   const handleDelegate = () => {
-    startTransition(async () => {
-      await updateTask(task.id, {
-        delegated_to: "openclaw",
-        delegation_status: "pending",
-      } as any);
-      router.refresh();
-      toast.success("Delegated to OpenClaw");
-    });
+    setIsDelegateModalOpen(true);
   };
 
   return (
@@ -271,6 +266,12 @@ export function TaskDetailSheet({
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
+            {task.delegated_to && (
+              <span className="flex items-center gap-1 text-[10px] bg-purple-500/10 text-purple-500 font-bold uppercase tracking-wider px-2 py-1 rounded">
+                <Bot className="w-3 h-3" />
+                {task.delegated_to}
+              </span>
+            )}
           </div>
         </SheetHeader>
 
@@ -667,11 +668,27 @@ export function TaskDetailSheet({
                     <Trash2 className="w-4 h-4" /> Delete
                   </Button>
                 </div>
+                <div className="flex gap-2 w-full mt-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 gap-2 text-foreground bg-primary/5 hover:bg-primary/20 border-primary/20" 
+                    onClick={handleDelegate}
+                  >
+                    <Bot className="w-4 h-4" /> Delegate
+                  </Button>
+                </div>
               </>
             )}
           </div>
         </div>
       </SheetContent>
+
+      <DelegateModal
+        taskId={task.id}
+        isOpen={isDelegateModalOpen}
+        onClose={() => setIsDelegateModalOpen(false)}
+        taskCategory={(task as any).category}
+      />
     </Sheet>
   );
 }

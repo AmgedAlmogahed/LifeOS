@@ -1,21 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Bot, CheckCircle2, ChevronRight, X } from "lucide-react";
+import { AlertCircle, Bell, Bot, CheckCircle2, ChevronRight, DollarSign, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getRecentDelegations } from "@/lib/actions/delegation";
+import { getCriticalAuditLogs } from "@/lib/actions/audit-logs";
+import { getBudgetOverruns } from "@/lib/actions/projects";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 interface Notification {
     id: string;
-    type: "delegation" | "agent_report";
+    type: "delegation" | "agent_report" | "audit_critical" | "budget_overrun";
     title: string;
     body: string;
     timestamp: string;
     read: boolean;
     link?: string;
+    metadata?: any;
 }
 
 export function NotificationCenter() {
@@ -35,12 +38,17 @@ export function NotificationCenter() {
         return () => document.removeEventListener("mousedown", handleClick);
     }, [isOpen]);
 
-    // Fetch notifications from delegation log
+    // Fetch notifications from multiple sources
     useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const delegations = await getRecentDelegations(15);
-                const mapped: Notification[] = (delegations as any[]).map((d) => ({
+                const [delegations, auditLogs, overruns] = await Promise.all([
+                    getRecentDelegations(10),
+                    getCriticalAuditLogs(5),
+                    getBudgetOverruns()
+                ]);
+
+                const delegNodes: Notification[] = (delegations as any[]).map((d) => ({
                     id: d.id,
                     type: "delegation" as const,
                     title: `${d.agent_id}: ${d.status === "completed" ? "Task completed" : d.status === "failed" ? "Task failed" : d.status === "in_progress" ? "Working on task" : "Task pending"}`,
@@ -49,7 +57,30 @@ export function NotificationCenter() {
                     read: d.status === "completed" || d.status === "failed",
                     link: d.tasks?.project_id ? `/projects/${d.tasks.project_id}` : undefined,
                 }));
-                setNotifications(mapped);
+
+                const auditNodes: Notification[] = (auditLogs as any[]).map((log) => ({
+                    id: log.id,
+                    type: "audit_critical" as const,
+                    title: `System Alert: ${log.event_type || 'Error'}`,
+                    body: log.description || "A critical system event occurred.",
+                    timestamp: log.created_at,
+                    read: false,
+                    link: "/logs",
+                }));
+
+                const budgetNodes: Notification[] = (overruns as any[]).map((p) => ({
+                    id: `overrun-${p.id}`,
+                    type: "budget_overrun" as const,
+                    title: `Budget Alert: ${p.name}`,
+                    body: `Budget exceeded by $${p.overage.toLocaleString()}. Total spent: $${p.total_spent.toLocaleString()}.`,
+                    timestamp: new Date().toISOString(), // Use current for simplicity as it's a dynamic check
+                    read: false,
+                    link: `/projects/${p.id}`,
+                }));
+
+                setNotifications([...budgetNodes, ...auditNodes, ...delegNodes].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                ));
             } catch (err) {
                 console.error("Failed to fetch notifications:", err);
             } finally {
@@ -129,15 +160,15 @@ export function NotificationCenter() {
                                     {/* Icon */}
                                     <div className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                                        notif.type === "delegation"
-                                            ? "bg-purple-500/10 text-purple-500"
-                                            : "bg-blue-500/10 text-blue-500"
+                                        notif.type === "delegation" ? "bg-purple-500/10 text-purple-500" :
+                                        notif.type === "audit_critical" ? "bg-red-500/10 text-red-500" :
+                                        notif.type === "budget_overrun" ? "bg-amber-500/10 text-amber-500" :
+                                        "bg-blue-500/10 text-blue-500"
                                     )}>
-                                        {notif.type === "delegation" ? (
-                                            <Bot className="w-4 h-4" />
-                                        ) : (
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        )}
+                                        {notif.type === "delegation" ? <Bot className="w-4 h-4" /> :
+                                         notif.type === "audit_critical" ? <AlertCircle className="w-4 h-4" /> :
+                                         notif.type === "budget_overrun" ? <DollarSign className="w-4 h-4" /> :
+                                         <CheckCircle2 className="w-4 h-4" />}
                                     </div>
 
                                     {/* Content */}

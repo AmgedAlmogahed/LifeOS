@@ -4,6 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { InvoiceInsert, InvoiceUpdate, PaymentInsert } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
+export async function getInvoices(accountId?: string) {
+    const supabase = await createClient();
+    let query = (supabase.from("invoices") as any).select("*, clients(name)").order("created_at", { ascending: false });
+    if (accountId) query = query.eq("account_id", accountId);
+    
+    const { data, error } = await query;
+    if (error) {
+        console.error("[getInvoices]", error.message);
+        return [];
+    }
+    return data;
+}
+
+
 export async function createInvoice(invoice: InvoiceInsert) {
     const supabase = await createClient();
     const { data, error } = await (supabase.from("invoices") as any).insert(invoice).select().single();

@@ -36,6 +36,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     lastSessionRes,
     dependenciesRes,
     stateContextRes,
+    docsRes,
+    bundleRes,
   ] = await Promise.all([
     supabase.from("tasks").select("*").eq("project_id", id).order("created_at", { ascending: false }),
     supabase.from("project_assets").select("*").eq("project_id", id).order("created_at", { ascending: false }),
@@ -64,6 +66,10 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       .select("*")
       .eq("project_id", id)
       .maybeSingle(),
+    // Fetch documents
+    supabase.from("documents" as any).select("*").eq("project_id", id).order("created_at", { ascending: false }),
+    // Fetch context bundle
+    supabase.from("context_bundles" as any).select("*").eq("project_id", id).eq("bundle_type", "project").maybeSingle(),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,6 +89,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       resumeNote={resumeNote}
       taskDependencies={(dependenciesRes.data as unknown as TaskDependency[]) ?? []}
       projectStateContext={(stateContextRes.data as ProjectStateContext | null) ?? null}
+      documents={(docsRes.data ?? []) as any[]}
+      contextBundle={bundleRes.data as any}
     />
   );
 }

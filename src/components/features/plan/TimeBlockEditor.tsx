@@ -165,6 +165,22 @@ export function TimeBlockEditor({ initialBlocks, onSave, tasks = [] }: TimeBlock
                             className="flex-1 h-8 text-sm"
                         />
 
+                        {/* Task Select (Optional) */}
+                        {tasks.length > 0 && (
+                            <select
+                                className="h-8 text-[10px] sm:text-xs rounded-md border border-input bg-background px-2 overflow-hidden max-w-[120px]"
+                                value={block.taskId || ""}
+                                onChange={(e) => updateBlock(block.id, { taskId: e.target.value || undefined })}
+                            >
+                                <option value="">No Task</option>
+                                {tasks.map(t => (
+                                    <option key={t.id} value={t.id} title={t.title}>
+                                        {t.title.substring(0, 20)}{t.title.length > 20 ? "..." : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
                         {/* Delete */}
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500 shrink-0"
                                 onClick={() => removeBlock(block.id)}>

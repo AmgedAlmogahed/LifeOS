@@ -3,7 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Task } from "@/types/database";
-import { Circle, AlertCircle, CheckCircle2, Pause, Lock } from "lucide-react";
+import { Circle, AlertCircle, CheckCircle2, Pause, Lock, Bot } from "lucide-react";
 
 import { cn, formatDate } from "@/lib/utils";
 
@@ -63,6 +63,12 @@ export function SortableTaskCard({ task, onTaskClick, disabled, isLocked = false
           {task.status === "Blocked" && (task as any).block_reason && (
              <div className="mt-1 text-[10px] font-medium text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 inline-block truncate max-w-full">
                 Blocked: {(task as any).block_reason}
+             </div>
+          )}
+          {task.delegated_to && (
+             <div className="mt-1 text-[10px] font-medium text-purple-500 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 inline-flex items-center gap-1">
+                <Bot className="w-3 h-3" />
+                Anton ({task.delegated_to})
              </div>
           )}
       </div>

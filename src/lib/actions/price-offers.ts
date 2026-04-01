@@ -14,21 +14,32 @@ export async function createPriceOffer(formData: FormData) {
     let items: unknown[] = [];
     try { items = JSON.parse(itemsRaw || "[]"); } catch { /* empty */ }
 
+    const paymentScheduleRaw = formData.get("payment_schedule") as string;
+    let payment_schedule = [];
+    try { payment_schedule = JSON.parse(paymentScheduleRaw || "[]"); } catch { /* empty */ }
+
     const total_value = (items as any[]).reduce((s, i) => s + (Number(i.total) || 0), 0);
 
     const { error } = await (supabase.from("price_offers") as any).insert({
         client_id,
+        account_id: formData.get("account_id") as string || null,
         opportunity_id: formData.get("opportunity_id") as string || null,
         title: title.trim(),
         items,
         total_value,
+        vat_type: (formData.get("vat_type") as string) || "15%",
+        discount_amount: Number(formData.get("discount_amount") || 0),
+        payment_schedule,
         status: "Draft",
         valid_until: formData.get("valid_until") as string || null,
+        pdf_url: formData.get("pdf_url") as string || null,
+        sent_date: formData.get("sent_date") as string || null,
         notes: (formData.get("notes") as string) ?? "",
+        version: Number(formData.get("version") || 1),
     });
 
     if (error) return { error: error.message };
-    revalidatePath("/vault");
+    revalidatePath("/quotes");
     revalidatePath("/dashboard");
     return { success: true };
 }
@@ -54,7 +65,7 @@ export async function updatePriceOffer(id: string, formData: FormData) {
         if (offer) await runAutomator("offer_accepted", offer);
     }
 
-    revalidatePath("/vault");
+    revalidatePath("/quotes");
     revalidatePath("/dashboard");
     return { success: true };
 }

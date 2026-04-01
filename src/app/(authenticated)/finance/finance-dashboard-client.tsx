@@ -1,13 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, FileText, ArrowUpRight, ArrowDownRight, Building2, CreditCard, Receipt, Wallet, FilePlus } from "lucide-react";
+import { DollarSign, FileText, ArrowUpRight, ArrowDownRight, Building2, CreditCard, Receipt, Wallet, FilePlus, Plus, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { markInvoicePaid } from "@/lib/actions/finance";
+import { toast } from "sonner";
+import { InvoiceModal } from "@/components/features/finance/InvoiceModal";
+import { ExpenseModal } from "@/components/features/finance/ExpenseModal";
 
 function currency(v: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v); }
 
-export function FinanceDashboardClient({ accounts, invoices, expenses }: { accounts: any[], invoices: any[], expenses: any[] }) {
+export function FinanceDashboardClient({ accounts, invoices, expenses, clients, projects }: { 
+  accounts: any[], 
+  invoices: any[], 
+  expenses: any[],
+  clients: any[],
+  projects: any[]
+}) {
   const [activeAccountId, setActiveAccountId] = useState<string | null>(accounts[0]?.id || null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
+  const [editingExpense, setEditingExpense] = useState<any>(null);
 
   const filteredInvoices = activeAccountId ? invoices.filter(i => i.account_id === activeAccountId) : invoices;
   const filteredExpenses = activeAccountId ? expenses.filter(e => e.account_id === activeAccountId) : expenses;
@@ -39,8 +53,17 @@ export function FinanceDashboardClient({ accounts, invoices, expenses }: { accou
              <option value="">Cross-Company All</option>
              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} {a.legal_name ? `(${a.legal_name})` : ''}</option>)}
            </select>
-           <button className="text-xs btn-gradient bg-emerald-500 hover:bg-emerald-600 px-4 py-1.5 ml-2 shadow-sm rounded-md flex items-center gap-2">
-             <FilePlus className="w-3.5 h-3.5" /> Generate Invoice
+           <button 
+             className="text-xs btn-gradient bg-emerald-500 hover:bg-emerald-600 px-4 py-1.5 ml-2 shadow-sm rounded-md flex items-center gap-2"
+             onClick={() => { setEditingInvoice(null); setIsInvoiceModalOpen(true); }}
+           >
+             <Plus className="w-3.5 h-3.5" /> Invoice
+           </button>
+           <button 
+             className="text-xs btn-gradient bg-amber-500 hover:bg-amber-600 px-4 py-1.5 ml-0 shadow-sm rounded-md flex items-center gap-2"
+             onClick={() => { setEditingExpense(null); setIsExpenseModalOpen(true); }}
+           >
+             <Plus className="w-3.5 h-3.5" /> Expense
            </button>
         </div>
       </div>
@@ -99,10 +122,28 @@ export function FinanceDashboardClient({ accounts, invoices, expenses }: { accou
                   </div>
                 ) : (
                   filteredInvoices.slice(0, 8).map(inv => (
-                    <div key={inv.id} className="p-3 bg-accent/20 border border-border/50 rounded-lg flex items-center justify-between">
-                       <div>
-                         <div className="text-xs font-bold text-foreground mb-0.5">{inv.invoice_number || 'DRF-001'}</div>
-                         <div className="text-[10px] text-muted-foreground">{inv.clients?.name || 'Unknown Client'}</div>
+                     <div key={inv.id} className="p-3 bg-accent/20 border border-border/50 rounded-lg flex items-center justify-between group">
+                       <div className="flex items-center gap-3">
+                         <div className="flex flex-col">
+                           <div className="text-xs font-bold text-foreground mb-0.5">{inv.invoice_number || 'DRF-001'}</div>
+                           <div className="text-[10px] text-muted-foreground">{inv.clients?.name || 'Unknown Client'}</div>
+                         </div>
+                         {inv.status !== 'Paid' && (
+                           <button 
+                             onClick={async () => {
+                               try {
+                                 await markInvoicePaid(inv.id);
+                                 toast.success("Invoice marked as paid");
+                               } catch (err) {
+                                 toast.error("Failed to mark as paid");
+                               }
+                             }}
+                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-emerald-500/20 rounded-md text-emerald-500"
+                             title="Mark as Paid"
+                           >
+                              <CheckCircle2 className="w-4 h-4" />
+                           </button>
+                         )}
                        </div>
                        <div className="text-right">
                          <div className="text-sm font-bold">{currency(inv.amount)}</div>
@@ -147,6 +188,25 @@ export function FinanceDashboardClient({ accounts, invoices, expenses }: { accou
            </div>
         </div>
       </div>
+
+      <InvoiceModal 
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        editingInvoice={editingInvoice}
+        clients={clients}
+        projects={projects}
+        accounts={accounts}
+        defaultAccountId={activeAccountId || undefined}
+      />
+
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        editingExpense={editingExpense}
+        projects={projects}
+        accounts={accounts}
+        defaultAccountId={activeAccountId || undefined}
+      />
     </div>
   );
 }

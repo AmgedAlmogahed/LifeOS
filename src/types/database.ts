@@ -10,6 +10,8 @@ export type { Database } from "./supabase";
 export type { Json } from "./supabase";
 export type { Tables, TablesInsert, TablesUpdate, Enums, CompositeTypes } from "./supabase";
 
+import type { Json } from "./supabase";
+
 // ─── Convenience Enum Types ────────────────────────────────────────────────
 export type ProjectStatus = "Backlog" | "Understand" | "Document" | "Freeze" | "Implement" | "Verify";
 export type TaskStatus = "Todo" | "In Progress" | "Done" | "Blocked" | "Cancelled";
@@ -48,6 +50,9 @@ export type TaxRecordStatus = "draft" | "filed" | "paid";
 export type TransactionDirection = "inflow" | "outflow";
 export type TimeBlockType = "focus" | "admin" | "break";
 export type StateSnapshotTrigger = "focus_exit" | "daily_review" | "manual";
+export type LeadChannel = "CH-REF" | "CH-SOC" | "CH-WEB" | "CH-MAP" | "CH-AI" | "CH-OUT";
+export type LeadStatus = "INCOMING" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+export type LeadPriority = "Normal" | "High" | "Urgent";
 
 // ─── Row Type Aliases (from generated Tables helper) ────────────────────────
 import type { Tables as T, TablesInsert as TI, TablesUpdate as TU } from "./supabase";
@@ -241,6 +246,58 @@ export interface DailyPlanExtended extends DailyPlan {
   plan_version?: number;
 }
 
+export interface Lead {
+  id: string;
+  account_id: string;
+  channel: LeadChannel;
+  contact_name: string;
+  mobile: string | null;
+  email: string | null;
+  region: string | null;
+  services_requested: string[] | null;
+  notes: string;
+  priority: LeadPriority;
+  source_detail: string;
+  estimated_value: number;
+  status: LeadStatus;
+  disqualify_reason: string | null;
+  converted_client_id: string | null;
+  converted_opportunity_id: string | null;
+  channel_metadata: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountExtended extends Account {
+  legal_name?: string | null;
+  cr_number?: string | null;
+  vat_number?: string | null;
+  logo_url?: string | null;
+  letterhead_url?: string | null;
+  primary_color?: string;
+  bank_name?: string | null;
+  bank_iban?: string | null;
+  bank_account_name?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  country?: string;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  is_active?: boolean;
+}
+
+export interface PriceOfferExtended extends PriceOffer {
+  account_id?: string | null;
+  vat_type?: string;
+  discount_amount?: number;
+  payment_schedule?: Json;
+  pdf_url?: string | null;
+  sent_date?: string | null;
+  version?: number;
+}
+
 // ─── Insert Type Aliases ────────────────────────────────────────────────────
 export type ClientInsert = TI<"clients">;
 export type OpportunityInsert = TI<"opportunities">;
@@ -302,6 +359,9 @@ export type TaxRecordInsert = Omit<TaxRecord, 'id' | 'created_at' | 'updated_at'
 export type TaxRecordUpdate = Partial<Omit<TaxRecord, 'id'>>;
 export type BankTransactionInsert = Omit<BankTransaction, 'id' | 'created_at'> & { id?: string; created_at?: string };
 export type BankTransactionUpdate = Partial<Omit<BankTransaction, 'id'>>;
+export type LeadInsert = Omit<Lead, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string };
+export type LeadUpdate = Partial<Omit<Lead, 'id'>>;
+
 
 // ─── Composite Types ────────────────────────────────────────────────────────
 

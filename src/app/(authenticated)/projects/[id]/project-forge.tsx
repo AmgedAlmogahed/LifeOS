@@ -17,12 +17,12 @@ import { updateProjectStatus } from "@/lib/actions/projects";
 import { addTaskDependency } from "@/lib/actions/task-dependencies";
 import { updateSprint } from "@/lib/actions/sprints";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/components/ui/back-button";
 import {
   Lock, ArrowLeft, Circle, CheckCircle2, AlertCircle, Pause,
   ListChecks, BarChart2, Clock,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
 } from "lucide-react";
-import Link from "next/link";
 
 // ─── Consultancy Lifecycle ────────────────────────────────────────────────────
 const LIFECYCLE_STAGES = ["Lead", "Proposal", "Planning", "Building", "Deploy", "Delivery"] as const;
@@ -60,15 +60,19 @@ interface ProjectCanvasProps {
   resumeNote: string | null;
   taskDependencies: TaskDependency[];
   projectStateContext: PSCType | null;
+  documents: any[];
+  contextBundle: any;
 }
 
 export function ProjectCanvas({
   project, tasks, assets, minutes, invoices, sprints,
   milestones, scopeNodes, authorityApplications, resumeNote, taskDependencies,
-  projectStateContext,
+  projectStateContext, documents, contextBundle
 }: ProjectCanvasProps) {
   const router = useRouter();
-
+  
+  const isPersonal = !project.account_id && !project.client_id;
+  
   const [freezing, setFreezing] = useState(false);
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
   const [execTab, setExecTab] = useState<ExecTab>("roadmap");
@@ -224,9 +228,7 @@ export function ProjectCanvas({
 
       {/* ═══ HEADER ══════════════════════════════════════════════════════════ */}
       <div className="h-14 border-b border-border flex items-center px-4 bg-card/50 backdrop-blur-sm shrink-0 gap-3">
-        <Link href="/projects" className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
+        <BackButton fallbackHref="/projects" variant="ghost" size="icon" label="" className="h-8 w-8" />
 
         {/* Col 1 toggle */}
         <button
@@ -428,10 +430,13 @@ export function ProjectCanvas({
               projectId={project.id}
               projectBudget={(project as any).budget ?? 0}
               assets={assets}
-              invoices={invoices}
+              invoices={isPersonal ? [] : invoices} /* Adaptive UI: hide finance for personal */
               milestones={milestones}
               authorityApplications={authorityApplications}
               scopeNodes={scopeNodes}
+              isPersonal={isPersonal}
+              documents={documents}
+              contextBundle={contextBundle}
             />
           </div>
         </aside>

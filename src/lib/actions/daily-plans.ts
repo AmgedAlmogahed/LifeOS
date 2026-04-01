@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { DailyPlanUpdate } from "@/types/database";
+import { DailyPlanUpdate, DailyPlanExtended } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
 export async function getOrCreateDailyPlan(planDate: string) {
@@ -22,7 +22,7 @@ export async function getOrCreateDailyPlan(planDate: string) {
     return data;
 }
 
-export async function updateDailyPlan(planId: string, update: DailyPlanUpdate) {
+export async function updateDailyPlan(planId: string, update: Partial<DailyPlanExtended>) {
     const supabase = await createClient();
     const { error } = await supabase.from("daily_plans").update(update).eq("id", planId);
     if (error) throw error;

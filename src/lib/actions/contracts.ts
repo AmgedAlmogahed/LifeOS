@@ -4,6 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { runAutomator } from "./automator";
 
+export async function getContracts(accountId?: string) {
+    const supabase = await createClient();
+    let query = (supabase.from("contracts") as any).select("*, clients(name)").order("created_at", { ascending: false });
+    if (accountId) query = query.eq("account_id", accountId);
+    
+    const { data, error } = await query;
+    if (error) {
+        console.error("[getContracts]", error.message);
+        return [];
+    }
+    return data;
+}
+
+
 export async function createContract(formData: FormData) {
     const supabase = await createClient();
     const title = formData.get("title") as string;
@@ -12,6 +26,7 @@ export async function createContract(formData: FormData) {
 
     const { error } = await (supabase.from("contracts") as any).insert({
         client_id,
+        account_id: formData.get("account_id") as string || null,
         opportunity_id: formData.get("opportunity_id") as string || null,
         price_offer_id: formData.get("price_offer_id") as string || null,
         title: title.trim(),
@@ -24,7 +39,7 @@ export async function createContract(formData: FormData) {
     });
 
     if (error) return { error: error.message };
-    revalidatePath("/vault");
+    revalidatePath("/contracts");
     revalidatePath("/dashboard");
     return { success: true };
 }
@@ -49,7 +64,7 @@ export async function updateContract(id: string, formData: FormData) {
         if (contract) await runAutomator("contract_activated", contract);
     }
 
-    revalidatePath("/vault");
+    revalidatePath("/contracts");
     revalidatePath("/dashboard");
     return { success: true };
 }

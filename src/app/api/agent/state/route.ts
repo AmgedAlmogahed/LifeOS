@@ -21,14 +21,17 @@ export async function GET(req: NextRequest) {
     try {
         if (projectId) {
             // Retrieve unified state context for a specific project
-            const { data, error } = await supabase
-                .from("project_state_context")
-                .select("*")
-                .eq("project_id", projectId)
-                .single();
+            const [stateRes, bundleRes] = await Promise.all([
+                supabase.from("project_state_context").select("*").eq("project_id", projectId).single(),
+                supabase.from("context_bundles" as any).select("*").eq("project_id", projectId).eq("bundle_type", "project").maybeSingle()
+            ]);
 
-            if (error) throw error;
-            return NextResponse.json({ data });
+            if (stateRes.error) throw stateRes.error;
+            
+            return NextResponse.json({ 
+                data: stateRes.data,
+                context_bundle: bundleRes.data
+            });
         } else {
             // Retrieve global cross-project state context
             const { data, error } = await supabase

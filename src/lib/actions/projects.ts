@@ -127,3 +127,30 @@ export async function updateProjectStatus(id: string, status: string) {
     revalidatePath(`/projects/${id}`);
     return { success: true };
 }
+/** Find projects where total expenses exceed the defined budget */
+export async function getBudgetOverruns() {
+    const supabase = await createClient();
+    
+    // Fetch all projects with budgets
+    const { data: projects } = await (supabase.from("projects") as any).select("id, name, budget").gt("budget", 0);
+    
+    if (!projects) return [];
+
+    const overruns = [];
+    for (const p of projects) {
+        const { data: expenses } = await (supabase.from("expenses") as any).select("amount").eq("project_id", p.id);
+        const total = (expenses || []).reduce((acc: number, e: any) => acc + Number(e.amount), 0);
+        
+        if (total > p.budget) {
+            overruns.push({
+                id: p.id,
+                name: p.name,
+                budget: p.budget,
+                total_spent: total,
+                overage: total - p.budget
+            });
+        }
+    }
+    
+    return overruns;
+}
