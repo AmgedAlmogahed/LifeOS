@@ -3,13 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Client } from "@/types/database";
-import { Users, Search, ArrowRight, Plus, Heart } from "lucide-react";
+import { Users, Search, ArrowRight, Plus, Heart, Filter } from "lucide-react";
 import { ClientForm } from "@/components/forms/client-form";
+import { CompanyBadge } from "@/components/ui/company-badge";
+import { cn } from "@/lib/utils";
 
-export function ClientsList({ clients }: { clients: Client[] }) {
+export function ClientsList({ initialClients, accounts }: { initialClients: any[], accounts: any[] }) {
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
-  const filtered = clients.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()));
+
+  const filtered = initialClients.filter((c) => {
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+    
+    if (companyFilter !== "all") {
+      if (companyFilter === "personal" && c.account_id !== null) return false;
+      if (companyFilter !== "personal" && c.account_id !== companyFilter) return false;
+    }
+    
+    return true;
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -30,6 +43,52 @@ export function ClientsList({ clients }: { clients: Client[] }) {
           </div>
           <button onClick={() => setShowForm(true)} className="btn-gradient px-3 py-1.5 text-xs flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New Client
+          </button>
+        </div>
+      </div>
+
+      <div className="h-12 border-b border-border flex items-center px-6 bg-card/20 shrink-0 gap-6 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">
+          <Filter className="w-3 h-3" /> Filters:
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setCompanyFilter("all")}
+            className={cn(
+              "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
+              companyFilter === "all" 
+                ? "bg-primary/10 border-primary/30 text-primary" 
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            All Companies
+          </button>
+          {accounts.map((acc) => (
+            <button
+              key={acc.id}
+              onClick={() => setCompanyFilter(acc.id)}
+              className={cn(
+                "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap flex items-center gap-1.5",
+                companyFilter === acc.id 
+                  ? "bg-primary/10 border-primary/30 text-primary" 
+                  : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acc.primary_color || '#6366f1'}} />
+              {acc.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setCompanyFilter("personal")}
+            className={cn(
+              "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
+              companyFilter === "personal" 
+                ? "bg-primary/10 border-primary/30 text-primary" 
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Personal
           </button>
         </div>
       </div>
@@ -56,9 +115,12 @@ export function ClientsList({ clients }: { clients: Client[] }) {
                       {client.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                        {client.name}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1">
+                         <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                           {client.name}
+                         </h3>
+                         <CompanyBadge account={client.accounts} size="sm" />
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Heart className="w-3 h-3" style={{ color: client.health_score >= 75 ? "oklch(0.72 0.20 155)" : client.health_score >= 50 ? "oklch(0.78 0.14 80)" : "oklch(0.63 0.24 25)" }} />
                         <span className={`text-[11px] font-semibold ${client.health_score >= 75 ? "health-excellent" : client.health_score >= 50 ? "health-warning" : "health-critical"}`}>

@@ -38,7 +38,7 @@ export async function createLead(formData: FormData) {
   const servicesRaw = formData.get("services_requested") as string;
   const services_requested = servicesRaw ? servicesRaw.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
-  const { error } = await (supabase.from("leads" as any) as any).insert({
+  const { data: lead, error } = await (supabase.from("leads" as any) as any).insert({
     account_id,
     channel,
     contact_name,
@@ -52,9 +52,18 @@ export async function createLead(formData: FormData) {
     estimated_value: parseFloat((formData.get("estimated_value") as string) || "0") || 0,
     channel_metadata: channelMetadata,
     status: "INCOMING",
-  });
+  }).select().single();
 
   if (error) return { error: error.message };
+
+  if (lead) {
+      // Create pipeline tracker
+      await (supabase.from("pipeline_tracker") as any).insert({
+          account_id: account_id,
+          lead_id: lead.id,
+          current_stage: "lead_new"
+      });
+  }
 
   revalidatePath("/leads");
   revalidatePath("/cockpit");
@@ -128,6 +137,32 @@ export async function convertLead(id: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+    
+  // 5. Advance Pipeline Tracker
+  const { data: tracker } = await (supabase.from("pipeline_tracker") as any)
+    .select("id")
+    .eq("lead_id", id)
+    .single();
+
+  if (tracker) {
+    await supabase.rpc('advance_pipeline', {
+      p_tracker_id: tracker.id,
+      p_new_stage: 'opportunity_created'
+    });
+    // Link client and opp
+    await (supabase.from("pipeline_tracker") as any)
+      .update({ client_id: client.id, opportunity_id: opp.id })
+      .eq("id", tracker.id);
+  } else {
+    // If for some reason legacy lead didn't have one, create it now
+    await (supabase.from("pipeline_tracker") as any).insert({
+      account_id: lead.account_id,
+      lead_id: lead.id,
+      client_id: client.id,
+      opportunity_id: opp.id,
+      current_stage: "opportunity_created"
+    });
+  }
 
   revalidatePath("/leads");
   revalidatePath("/clients");

@@ -5,6 +5,7 @@ import { ArrowRight, Bot, Calendar, Clock, LayoutGrid, Target, CheckCircle2, Mes
 import Link from "next/link";
 import { formatDistanceToNow, format } from "date-fns";
 import { AgentFeed } from "@/components/features/agents/AgentFeed";
+import { CompanyBadge } from "@/components/ui/company-badge";
 
 export default async function CockpitPage() {
     const supabase = await createClient();
@@ -24,6 +25,7 @@ export default async function CockpitPage() {
         supabase.from("projects")
             .select(`
               *,
+              accounts(name, primary_color),
               focus_sessions(
                 session_notes,
                 ended_at
@@ -144,13 +146,16 @@ export default async function CockpitPage() {
                         return (
                         <Link key={project.id} href={`/projects/${project.id}`} className="group block h-full">
                             <div className="h-full bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-colors flex flex-col">
-                                <div className="flex items-start justify-between mb-3">
-                                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{project.name}</h3>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider
-                                        ${project.status === 'Implement' ? 'bg-amber-500/10 text-amber-500' : 'bg-muted text-muted-foreground'}
-                                    `}>
-                                        {project.status}
-                                    </span>
+                                <div className="flex items-start justify-between mb-3 min-h-[3rem]">
+                                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-1">{project.name}</h3>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider
+                                            ${project.status === 'Implement' ? 'bg-amber-500/10 text-amber-500' : 'bg-muted text-muted-foreground'}
+                                        `}>
+                                            {project.status}
+                                        </span>
+                                        <CompanyBadge account={project.accounts} size="sm" />
+                                    </div>
                                 </div>
 
                                 <p className="text-sm text-muted-foreground line-clamp-2 mb-3 flex-1">

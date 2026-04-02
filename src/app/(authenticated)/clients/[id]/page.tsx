@@ -9,7 +9,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const supabase = await createClient();
 
   const [clientRes, oppsRes, contractsRes, projectsRes, reportsRes, invsRes, commRes, docsRes, bundleRes] = await Promise.all([
-    supabase.from("clients").select("*").eq("id", id).maybeSingle(),
+    supabase.from("clients").select("*, accounts(name, primary_color)").eq("id", id).maybeSingle(),
     supabase.from("opportunities").select("*").eq("client_id", id).order("updated_at", { ascending: false }),
     supabase.from("contracts").select("*").eq("client_id", id).order("created_at", { ascending: false }),
     supabase.from("projects").select("*").eq("client_id", id).order("updated_at", { ascending: false }),

@@ -90,6 +90,11 @@ export type Document = T<"documents">;
 export type Milestone = T<"milestones">;
 export type Module = T<"modules">;
 
+// Process Engine entities
+export type PipelineTracker = T<"pipeline_tracker">;
+export type PipelineHistory = T<"pipeline_history">;
+export type QuoteLineItem = T<"quote_line_items">;
+
 
 // Removed obsolete Module Architecture entities
 
@@ -274,7 +279,7 @@ export interface AccountExtended extends Account {
   vat_number?: string | null;
   logo_url?: string | null;
   letterhead_url?: string | null;
-  primary_color?: string;
+  primary_color: string | null;
   bank_name?: string | null;
   bank_iban?: string | null;
   bank_account_name?: string | null;
@@ -286,6 +291,24 @@ export interface AccountExtended extends Account {
   email?: string | null;
   website?: string | null;
   is_active?: boolean;
+}
+
+// Extended response types with joined accounts
+export interface ProjectWithAccount extends Project {
+  accounts?: {
+    name: string;
+    primary_color?: string;
+  } | null;
+  clients?: {
+    name: string;
+  } | null;
+}
+
+export interface ClientWithAccount extends Client {
+  accounts?: {
+    name: string;
+    primary_color?: string;
+  } | null;
 }
 
 export interface PriceOfferExtended extends PriceOffer {
@@ -323,6 +346,9 @@ export type AssetInsert = TI<"assets">;
 export type DocumentInsert = TI<"documents">;
 export type MilestoneInsert = TI<"milestones">;
 export type ModuleInsert = TI<"modules">;
+export type PipelineTrackerInsert = TI<"pipeline_tracker">;
+export type PipelineHistoryInsert = TI<"pipeline_history">;
+export type QuoteLineItemInsert = TI<"quote_line_items">;
 
 // ─── Update Type Aliases ────────────────────────────────────────────────────
 export type ClientUpdate = TU<"clients">;
@@ -344,6 +370,9 @@ export type AssetUpdate = TU<"assets">;
 export type DocumentUpdate = TU<"documents">;
 export type MilestoneUpdate = TU<"milestones">;
 export type ModuleUpdate = TU<"modules">;
+export type PipelineTrackerUpdate = TU<"pipeline_tracker">;
+export type PipelineHistoryUpdate = TU<"pipeline_history">;
+export type QuoteLineItemUpdate = TU<"quote_line_items">;
 
 // ─── Partial Types for New Table Inserts/Updates ────────────────────────────
 export type ProjectStateContextInsert = Omit<ProjectStateContext, 'id' | 'updated_at'> & { id?: string; updated_at?: string };

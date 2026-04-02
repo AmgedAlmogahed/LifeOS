@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useRef } from "react";
-import type { Client, Opportunity, Contract, Project, AgentReport } from "@/types/database";
+import type { Client, Opportunity, Contract, Project, AgentReport, ClientWithAccount } from "@/types/database";
 import {
   ArrowLeft, Heart, FileText, FolderKanban, TrendingUp,
   Bot, ExternalLink, Globe, Palette, Upload, Loader2,
@@ -17,6 +17,7 @@ import { DocumentUploadModal } from "@/components/features/documents/DocumentUpl
 import { ContextBundlePreview } from "@/components/features/documents/ContextBundlePreview";
 import { deleteDocument, markContextStale } from "@/lib/actions/documents";
 import { BackButton } from "@/components/ui/back-button";
+import { CompanyBadge } from "@/components/ui/company-badge";
 
 import { ClientHealthCard } from "@/components/features/clients/ClientHealthCard";
 import { CommunicationTimeline } from "./communication-timeline";
@@ -45,7 +46,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
 export function ClientDossier({
   client, opportunities, contracts, projects, agentReports, invoices, communicationLogs, documents, contextBundle
 }: {
-  client: Client; 
+  client: ClientWithAccount; 
   opportunities: Opportunity[]; 
   contracts: Contract[]; 
   projects: Project[]; 
@@ -121,6 +122,7 @@ export function ClientDossier({
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-foreground">{client.name}</h1>
+            <CompanyBadge account={client.accounts} size="sm" />
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
               classification === 'VIP' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' :
               classification === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500' :

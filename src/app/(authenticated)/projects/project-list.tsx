@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { 
@@ -9,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { CompanyBadge } from "@/components/ui/company-badge";
 
 const phaseStyles: Record<string, { css: string; bg: string; border: string }> = {
   Understand: { css: "phase-understand", bg: "phase-bg-understand", border: "phase-border-understand" },
@@ -22,40 +25,39 @@ export { ProjectList };
 
 import { useCompanyFilter } from "@/components/providers/company-filter-context";
 
-function ProjectList({ projects }: { projects: any[] }) {
+function ProjectList({ initialProjects, accounts }: { initialProjects: any[], accounts: any[] }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [ownershipFilter, setOwnershipFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"updated" | "name" | "progress" | "date">("updated");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   
-  const { selectedCompany } = useCompanyFilter();
+  // Note: We keep the global filter for workspace context, but the page-level filter 
+  // allows specific sub-filtering within the Projects module.
+  const { selectedCompany: globalCompany } = useCompanyFilter();
 
-  const filtered = projects.filter((p) => {
+  const filtered = initialProjects.filter((p) => {
     // 1. Text Search
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     
-    // 2. Status Match
+    // 3. Status Match
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     
-    // 3. Ownership Type Match
-    if (ownershipFilter !== "all") {
-      const isClient = !!p.client_id;
-      const isInternal = !!p.account_id && !p.client_id;
-      const isPersonal = !p.account_id && !p.client_id;
-      if (ownershipFilter === "client" && !isClient) return false;
-      if (ownershipFilter === "internal" && !isInternal) return false;
-      if (ownershipFilter === "personal" && !isPersonal) return false;
+    // 4. Local Company/Ownership Filter
+    if (companyFilter !== "all") {
+      if (companyFilter === "personal" && p.account_id !== null) return false;
+      if (companyFilter !== "personal" && p.account_id !== companyFilter) return false;
     }
 
-    // 4. Category Filter
+    // 5. Category Filter
     if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
     
-    // 5. Global Company Filter
-    if (selectedCompany !== "all") {
-      if (selectedCompany === "personal" && p.account_id !== null) return false;
-      // Deep match for internal projects if we had company IDs in current view
+    // 6. Global Industry/Company Filter (Top-level context)
+    if (globalCompany !== "all") {
+      if (globalCompany === "personal" && p.account_id !== null) return false;
+      // If global is an ID, it should match account_id
+      if (globalCompany !== "personal" && p.account_id !== globalCompany) return false;
     }
     
     return true;
@@ -72,7 +74,7 @@ function ProjectList({ projects }: { projects: any[] }) {
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
   });
 
-  const categories = Array.from(new Set(projects.map(p => p.category).filter(Boolean)));
+  const categories = Array.from(new Set(initialProjects.map(p => p.category).filter(Boolean)));
 
   return (
     <div className="flex flex-col h-full bg-background/50">
@@ -152,22 +154,45 @@ function ProjectList({ projects }: { projects: any[] }) {
           <Filter className="w-3 h-3" /> Filters:
         </div>
 
-        {/* Ownership */}
+        {/* Company / Ownership */}
         <div className="flex items-center gap-1.5">
-          {["all", "client", "internal", "personal"].map((opt) => (
+          <button
+            onClick={() => setCompanyFilter("all")}
+            className={cn(
+              "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
+              companyFilter === "all" 
+                ? "bg-primary/10 border-primary/30 text-primary" 
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            All Companies
+          </button>
+          {accounts.map((acc) => (
             <button
-              key={opt}
-              onClick={() => setOwnershipFilter(opt)}
+              key={acc.id}
+              onClick={() => setCompanyFilter(acc.id)}
               className={cn(
-                "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
-                ownershipFilter === opt 
+                "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap flex items-center gap-1.5",
+                companyFilter === acc.id 
                   ? "bg-primary/10 border-primary/30 text-primary" 
                   : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {opt === "all" ? "All Owners" : opt.charAt(0).toUpperCase() + opt.slice(1)}
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acc.primary_color || '#6366f1'}} />
+              {acc.name}
             </button>
           ))}
+          <button
+            onClick={() => setCompanyFilter("personal")}
+            className={cn(
+              "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap",
+              companyFilter === "personal" 
+                ? "bg-primary/10 border-primary/30 text-primary" 
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Personal
+          </button>
         </div>
 
         <div className="h-4 w-[1px] bg-border shrink-0" />
@@ -239,7 +264,7 @@ function ProjectList({ projects }: { projects: any[] }) {
             <Button variant="outline" className="mt-6 h-8 text-xs rounded-lg" onClick={() => {
               setSearch("");
               setStatusFilter("all");
-              setOwnershipFilter("all");
+              setCompanyFilter("all");
               setCategoryFilter("all");
             }}>
               Clear all filters
@@ -279,24 +304,7 @@ function ProjectList({ projects }: { projects: any[] }) {
 
 function ProjectCard({ project }: { project: any }) {
   const phase = phaseStyles[project.status] ?? phaseStyles.Understand;
-  const hasClient = !!project.client_id;
-  const isInternal = !!project.account_id && !project.client_id;
-  const isPersonal = !project.account_id && !project.client_id;
   
-  let ownershipIcon = <User className="w-3 h-3" />;
-  let ownershipLabel = "Personal";
-  let badgeColor = "text-gray-400 bg-gray-400/10 border-gray-400/20";
-  
-  if (hasClient) {
-    ownershipIcon = <Building2 className="w-3 h-3" />;
-    ownershipLabel = project.clients?.name || "Client";
-    badgeColor = "text-blue-400 bg-blue-400/10 border-blue-400/20";
-  } else if (isInternal) {
-    ownershipIcon = <Users className="w-3 h-3" />;
-    ownershipLabel = project.accounts?.name || "Internal";
-    badgeColor = "text-indigo-400 bg-indigo-400/10 border-indigo-400/20";
-  }
-
   return (
     <Link href={`/projects/${project.id}`} className="group block h-full">
       <div className="glass-card p-5 h-full flex flex-col hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 relative overflow-hidden group-hover:-translate-y-1">
@@ -304,10 +312,19 @@ function ProjectCard({ project }: { project: any }) {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         
         <div className="relative z-10 flex flex-col h-full">
-          <div className="flex items-start justify-between mb-4">
-            <div className={cn("px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-wider flex items-center gap-1", badgeColor)}>
-              {ownershipIcon}
-              {ownershipLabel}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CompanyBadge account={project.accounts} size="sm" />
+              {project.clients?.name && (
+                <div className="px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-wider bg-blue-400/10 border-blue-400/20 text-blue-400">
+                  {project.clients.name}
+                </div>
+              )}
+              {!project.client_id && project.account_id && (
+                <div className="px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-wider bg-indigo-400/10 border-indigo-400/20 text-indigo-400">
+                  Internal
+                </div>
+              )}
             </div>
             {project.is_frozen && (
               <div className="text-sky-400 bg-sky-400/10 border border-sky-400/20 p-1 rounded-md" title="Frozen Spec">
@@ -365,19 +382,6 @@ function ProjectCard({ project }: { project: any }) {
 
 function ProjectRow({ project }: { project: any }) {
   const phase = phaseStyles[project.status] ?? phaseStyles.Understand;
-  const hasClient = !!project.client_id;
-  const isInternal = !!project.account_id && !project.client_id;
-  
-  let label = "Personal";
-  let dotColor = "bg-gray-400";
-  
-  if (hasClient) {
-    label = project.clients?.name || "Client";
-    dotColor = "bg-blue-400";
-  } else if (isInternal) {
-    label = project.accounts?.name || "Internal";
-    dotColor = "bg-indigo-400";
-  }
 
   return (
     <tr 
@@ -405,8 +409,12 @@ function ProjectRow({ project }: { project: any }) {
       </td>
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
-          <div className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
-          <span className="text-xs font-medium text-foreground">{label}</span>
+          <CompanyBadge account={project.accounts} size="sm" />
+          {project.clients?.name && (
+            <div className="px-1.5 py-0.5 rounded-md border text-[8px] font-bold uppercase tracking-tighter bg-blue-400/10 border-blue-400/20 text-blue-400">
+              {project.clients.name}
+            </div>
+          )}
         </div>
       </td>
       <td className="px-5 py-3">

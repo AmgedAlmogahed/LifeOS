@@ -12,6 +12,7 @@ export async function createClientAction(formData: FormData) {
         name: name.trim(),
         email: (formData.get("email") as string) ?? "",
         phone: (formData.get("phone") as string) ?? "",
+        account_id: formData.get("account_id") as string || null,
         brand_primary: (formData.get("brand_primary") as string) || "#6366f1",
         brand_secondary: (formData.get("brand_secondary") as string) || "#8b5cf6",
         brand_accent: (formData.get("brand_accent") as string) || "#06b6d4",

@@ -20,7 +20,7 @@ export async function createPriceOffer(formData: FormData) {
 
     const total_value = (items as any[]).reduce((s, i) => s + (Number(i.total) || 0), 0);
 
-    const { error } = await (supabase.from("price_offers") as any).insert({
+    const { data: insertedOffer, error } = await (supabase.from("price_offers") as any).insert({
         client_id,
         account_id: formData.get("account_id") as string || null,
         opportunity_id: formData.get("opportunity_id") as string || null,
@@ -36,9 +36,35 @@ export async function createPriceOffer(formData: FormData) {
         sent_date: formData.get("sent_date") as string || null,
         notes: (formData.get("notes") as string) ?? "",
         version: Number(formData.get("version") || 1),
-    });
+    }).select().single();
 
     if (error) return { error: error.message };
+
+    // Insert into quote_line_items
+    if (insertedOffer && items.length > 0) {
+        const lineItems = (items as any[]).map(item => ({
+            quote_id: insertedOffer.id,
+            service_name: item.name || "Untitled Service",
+            service_category: item.service_category || item.service_type || null,
+            unit_price: Number(item.unit_price) || 0,
+            quantity: Number(item.quantity) || 1,
+            total_price: Number(item.total) || 0,
+            creates_project: item.creates_project === true || item.creates_project === "true"
+        }));
+        await (supabase.from("quote_line_items") as any).insert(lineItems);
+    }
+
+    // Advance pipeline to quote_draft if tracker_id is provided
+    const tracker_id = formData.get("tracker_id") as string;
+    if (tracker_id) {
+        await supabase.rpc('advance_pipeline', {
+            p_tracker_id: tracker_id,
+            p_new_stage: 'quote_draft'
+        });
+        // Also update tracker with the quote_id
+        await (supabase.from('pipeline_tracker') as any).update({ quote_id: insertedOffer.id }).eq('id', tracker_id);
+    }
+
     revalidatePath("/quotes");
     revalidatePath("/dashboard");
     return { success: true };
@@ -68,4 +94,32 @@ export async function updatePriceOffer(id: string, formData: FormData) {
     revalidatePath("/quotes");
     revalidatePath("/dashboard");
     return { success: true };
+}
+
+export async function markQuoteWon(quoteId: string, trackerId?: string) {
+    const supabase = await createClient();
+    
+    // 1. Update quote status 
+    const { error } = await (supabase.from("price_offers") as any).update({ status: "Accepted" }).eq("id", quoteId);
+    if (error) return { error: error.message };
+
+    // 2. Create projects from quote line items
+    const { data: result, error: rpcError } = await supabase.rpc('create_projects_from_quote', {
+        p_quote_id: quoteId
+    });
+
+    if (rpcError) return { error: rpcError.message };
+
+    // 3. Advance pipeline if applicable
+    if (trackerId) {
+        await supabase.rpc('advance_pipeline', {
+            p_tracker_id: trackerId,
+            p_new_stage: 'quote_won'
+        });
+    }
+
+    revalidatePath("/quotes");
+    revalidatePath("/projects");
+    revalidatePath("/dashboard");
+    return { success: true, result };
 }

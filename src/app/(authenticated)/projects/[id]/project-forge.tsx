@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import type { Project, Task, ProjectAsset, MeetingMinutes, Invoice, Sprint, Milestone } from "@/types/database";
+import type { Project, Task, ProjectAsset, MeetingMinutes, Invoice, Sprint, Milestone, ProjectWithAccount } from "@/types/database";
 import type { ProjectStateContext as PSCType } from "@/types/database";
 import type { ScopeNode } from "@/lib/actions/scope-nodes";
 import type { AuthorityApplication } from "@/lib/actions/authority-applications";
@@ -23,6 +23,7 @@ import {
   ListChecks, BarChart2, Clock,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
 } from "lucide-react";
+import { CompanyBadge } from "@/components/ui/company-badge";
 
 // ─── Consultancy Lifecycle ────────────────────────────────────────────────────
 const LIFECYCLE_STAGES = ["Lead", "Proposal", "Planning", "Building", "Deploy", "Delivery"] as const;
@@ -48,7 +49,7 @@ function normalizeStatus(status: string): LifecycleStage {
 type ExecTab = "roadmap" | "gantt";
 
 interface ProjectCanvasProps {
-  project: Project;
+  project: ProjectWithAccount;
   tasks: Task[];
   assets: ProjectAsset[];
   minutes: MeetingMinutes[];
@@ -240,6 +241,14 @@ export function ProjectCanvas({
         </button>
 
         <h1 className="text-sm font-semibold text-foreground truncate">{project.name}</h1>
+        
+        <CompanyBadge account={project.accounts} size="sm" />
+        
+        {project.clients?.name && (
+          <div className="px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-wider bg-blue-400/10 border-blue-400/20 text-blue-400 shrink-0">
+            {project.clients.name}
+          </div>
+        )}
 
         {project.is_frozen && (
           <span className="flex items-center gap-1 text-[10px] font-semibold text-sky-400 bg-sky-400/10 border border-sky-400/20 px-2 py-0.5 rounded-md shrink-0">

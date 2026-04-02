@@ -20,6 +20,7 @@ export type Database = {
           design_repo_url: string | null
           id: string
           name: string
+          primary_color: string | null
           updated_at: string
         }
         Insert: {
@@ -27,6 +28,7 @@ export type Database = {
           design_repo_url?: string | null
           id?: string
           name: string
+          primary_color?: string | null
           updated_at?: string
         }
         Update: {
@@ -34,7 +36,200 @@ export type Database = {
           design_repo_url?: string | null
           id?: string
           name?: string
+          primary_color?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          id: string
+          account_id: string
+          project_id: string | null
+          description: string
+          amount: number
+          vat_amount: number | null
+          category: string
+          receipt_url: string | null
+          vendor_name: string | null
+          expense_date: string
+          is_recurring: boolean | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          project_id?: string | null
+          description: string
+          amount: number
+          vat_amount?: number | null
+          category: string
+          receipt_url?: string | null
+          vendor_name?: string | null
+          expense_date?: string
+          is_recurring?: boolean | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          project_id?: string | null
+          description?: string
+          amount?: number
+          vat_amount?: number | null
+          category?: string
+          receipt_url?: string | null
+          vendor_name?: string | null
+          expense_date?: string
+          is_recurring?: boolean | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          id: string
+          account_id: string | null
+          channel: string | null
+          contact_name: string
+          mobile: string | null
+          email: string | null
+          service_interest: string | null
+          status: string
+          converted_client_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          channel?: string | null
+          contact_name: string
+          mobile?: string | null
+          email?: string | null
+          service_interest?: string | null
+          status?: string
+          converted_client_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          channel?: string | null
+          contact_name?: string
+          mobile?: string | null
+          email?: string | null
+          service_interest?: string | null
+          status?: string
+          converted_client_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pipeline_tracker: {
+        Row: {
+          id: string
+          account_id: string | null
+          current_stage: string
+          lead_id: string | null
+          client_id: string | null
+          opportunity_id: string | null
+          quote_id: string | null
+          contract_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          current_stage?: string
+          lead_id?: string | null
+          client_id?: string | null
+          opportunity_id?: string | null
+          quote_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          current_stage?: string
+          lead_id?: string | null
+          client_id?: string | null
+          opportunity_id?: string | null
+          quote_id?: string | null
+          contract_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pipeline_history: {
+        Row: {
+          id: string
+          tracker_id: string
+          stage: string
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tracker_id: string
+          stage: string
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tracker_id?: string
+          stage?: string
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      quote_line_items: {
+        Row: {
+          id: string
+          quote_id: string
+          service_name: string
+          service_category: string | null
+          unit_price: number
+          quantity: number
+          total_price: number
+          creates_project: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          service_name: string
+          service_category?: string | null
+          unit_price?: number
+          quantity?: number
+          total_price?: number
+          creates_project?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          service_name?: string
+          service_category?: string | null
+          unit_price?: number
+          quantity?: number
+          total_price?: number
+          creates_project?: boolean
+          created_at?: string
         }
         Relationships: []
       }
@@ -179,6 +374,7 @@ export type Database = {
           email: string | null
           health_score: number
           id: string
+          account_id: string | null
           is_active: boolean
           logo_url: string | null
           name: string
@@ -195,6 +391,7 @@ export type Database = {
           email?: string | null
           health_score?: number
           id?: string
+          account_id?: string | null
           is_active?: boolean
           logo_url?: string | null
           name: string
@@ -211,6 +408,7 @@ export type Database = {
           email?: string | null
           health_score?: number
           id?: string
+          account_id?: string | null
           is_active?: boolean
           logo_url?: string | null
           name?: string
@@ -218,7 +416,15 @@ export type Database = {
           phone?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       communication_logs: {
         Row: {
@@ -1496,7 +1702,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      advance_pipeline: {
+        Args: {
+          p_tracker_id: string
+          p_new_stage: string
+          p_note?: string
+        }
+        Returns: undefined
+      }
+      create_project_with_framework: {
+        Args: {
+          p_name: string
+          p_category: string
+          p_client_id?: string | null
+          p_account_id?: string | null
+          p_contract_id?: string | null
+          p_tracker_id?: string | null
+        }
+        Returns: Json
+      }
+      create_projects_from_quote: {
+        Args: {
+          p_quote_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       amendment_status: "Draft" | "Signed"

@@ -52,6 +52,17 @@ export async function POST(req: NextRequest) {
                 if (logErr) throw logErr;
                 break;
 
+            case "rpc": {
+                // For RPCs, 'id' can be the function_name, and 'data' contains the arguments
+                // Or 'data.function_name' contains it.
+                const functionName = data.function_name || id;
+                const rpcArgs = data.args || data;
+                
+                const { data: rpcRes, error: rpErr } = await supabase.rpc(functionName, rpcArgs);
+                if (rpErr) throw rpErr;
+                return NextResponse.json({ success: true, message: `RPC ${functionName} executed.`, result: rpcRes });
+            }
+
             default:
                 return NextResponse.json({ error: `Unknown mutation action: ${action}` }, { status: 400 });
         }
