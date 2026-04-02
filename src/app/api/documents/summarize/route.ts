@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-const pdf = require("pdf-parse");
+
 import mammoth from "mammoth";
 import { markContextStale } from "@/lib/actions/documents";
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Extract text
     if (doc.file_type === "application/pdf") {
-      // @ts-ignore
+      const pdf = require("pdf-parse");
       const pdfData = await pdf(buffer);
       text = pdfData.text;
     } else if (doc.file_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {

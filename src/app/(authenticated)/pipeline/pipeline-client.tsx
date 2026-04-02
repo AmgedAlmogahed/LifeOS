@@ -97,7 +97,7 @@ export function PipelineBoard({ opportunities, clients }: { opportunities: Oppor
                            
                            <div className="text-[10px] text-muted-foreground mb-3 font-medium flex items-center gap-1.5">
                              {client?.name || "Unknown Client"} 
-                             {client?.classification === 'VIP' && <span className="text-[8px] bg-amber-500/20 text-amber-500 px-1 py-0.5 rounded font-bold uppercase">VIP</span>}
+                             {(client as any)?.classification === 'VIP' && <span className="text-[8px] bg-amber-500/20 text-amber-500 px-1 py-0.5 rounded font-bold uppercase">VIP</span>}
                            </div>
 
                            <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 mt-auto pt-2 border-t border-border/40">

@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 export const metadata = { title: "Expense Tracker | Venture OS" };
 
 export default async function ExpensesPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/auth/login");
 
   const { data: accounts } = await supabase.from("accounts").select("*").eq("is_active", true);
 
-  let expenses = [];
+  let expenses: any[] = [];
   try {
     const { data: exps, error: expsErr } = await supabase.from("expenses").select("*, accounts(name)").order("expense_date", { ascending: false });
     if (!expsErr && exps) expenses = exps;

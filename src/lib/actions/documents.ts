@@ -58,7 +58,7 @@ export async function markContextStale(type: 'client' | 'project', entityId: str
     const supabase = await createClient();
     
     // Upsert a stale record
-    const { error } = await (supabase.from("context_bundles") as any).upsert({
+    const { error } = await (supabase as any).from("context_bundles").upsert({
         client_id: type === 'client' ? entityId : null,
         project_id: type === 'project' ? entityId : null,
         bundle_type: type,
@@ -119,7 +119,7 @@ export async function generateContextBundle(type: 'client' | 'project', entityId
     }
 
     // Save the bundle
-    const { error: bundleError } = await (supabase.from("context_bundles") as any).upsert({
+    const { error: bundleError } = await (supabase as any).from('context_bundles').upsert({
         client_id: type === 'client' ? entityId : null,
         project_id: type === 'project' ? entityId : null,
         bundle_type: type,
