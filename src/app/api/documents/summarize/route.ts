@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import pdf from "pdf-parse";
+const pdf = require("pdf-parse");
 import mammoth from "mammoth";
 import { markContextStale } from "@/lib/actions/documents";
 
